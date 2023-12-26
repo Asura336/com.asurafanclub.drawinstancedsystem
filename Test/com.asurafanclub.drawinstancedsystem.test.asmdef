@@ -1,0 +1,17 @@
+{
+    "name": "com.asurafanclub.drawinstancedsystem.test",
+    "rootNamespace": "",
+    "references": [
+        "com.asurafanclub.drawinstancedsystem",
+        "Unity.Collections"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
