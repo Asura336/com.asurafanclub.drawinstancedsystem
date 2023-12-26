@@ -5,6 +5,7 @@
   "description": "\u81ea\u5b9a\u4e49\u5408\u6279\u7684\u5b9e\u4f8b\u5316\u7ed8\u5236\u5305\u88c5\uff0c\u5bf9\u5e94 URP \u7ba1\u7ebf",
   "unity": "2022.3",
   "dependencies": {
-    "com.unity.collections": "2.1.4"
+    "com.unity.collections": "2.1.4",
+    "com.unity.render-pipelines.universal": "14.0.9"
   }
 }

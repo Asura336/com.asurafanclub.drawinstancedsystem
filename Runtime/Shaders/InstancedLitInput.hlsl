@@ -11,26 +11,11 @@
         #define _DETAIL
     #endif
 
-    // buffer for DrawMeshInstancedProcedural
-    #if defined(PROCEDURAL_INSTANCING_ON)
-        StructuredBuffer<float4x4> _Matrices;
-        // 如果要构建颜色数组替代材质实例颜色，在这里写然后替代后续的 _BaseColor
-        // 反正实例化绘制不兼容 SRP batcher...
-        #if defined(INSTANCED_COLOR)
-        StructuredBuffer<half4> _BaseColors;
-        #define _BaseColor _BaseColors[unity_InstanceID]
-        #endif
-    #endif
-
-    #if !defined(PROCEDURAL_INSTANCING_ON)
     // NOTE: Do not ifdef the properties here as SRP batcher can not handle different layouts.
     CBUFFER_START(UnityPerMaterial)
-    #endif
         float4 _BaseMap_ST;
         float4 _DetailAlbedoMap_ST;
-        #if !defined(INSTANCED_COLOR)
         half4 _BaseColor;
-        #endif
         half4 _SpecColor;
         half4 _EmissionColor;
         half _Cutoff;
@@ -44,8 +29,17 @@
         half _DetailAlbedoMapScale;
         half _DetailNormalMapScale;
         half _Surface;
-    #if !defined(PROCEDURAL_INSTANCING_ON)
     CBUFFER_END
+
+    // buffer for DrawMeshInstancedProcedural
+    #if defined(PROCEDURAL_INSTANCING_ON)
+        StructuredBuffer<float4x4> _Matrices;
+        // 如果要构建颜色数组替代材质实例颜色，在这里写然后替代后续的 _BaseColor
+        // 反正实例化绘制不兼容 SRP batcher...
+        #if defined(INSTANCED_COLOR)
+        StructuredBuffer<half4> _BaseColors;
+        #define _BaseColor _BaseColors[unity_InstanceID]
+        #endif
     #endif
 
     // NOTE: Do not ifdef the properties for dots instancing, but ifdef the actual usage.
