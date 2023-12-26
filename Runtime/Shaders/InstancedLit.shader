@@ -62,6 +62,9 @@ Shader "URP/Instanced/InstancedLit"
         // Editmode props
         _QueueOffset("Queue offset", Float) = 0.0
 
+        // Custom Instancing Options
+        [Toggle(INSTANCED_COLOR)] useInstancedColor("使用颜色缓冲区", Int) = 0
+
         // ObsoleteProperties
         [HideInInspector] _MainTex("BaseMap", 2D) = "white" {}
         [HideInInspector] _Color("Base Color", Color) = (1, 1, 1, 1)
@@ -153,7 +156,7 @@ Shader "URP/Instanced/InstancedLit"
             #pragma instancing_options renderinglayer
             // Custom...
             #pragma multi_compile _ PROCEDURAL_INSTANCING_ON
-            #pragma shader_feature INSTANCED_COLOR
+            #pragma shader_feature_local INSTANCED_COLOR
 
             #pragma vertex LitPassVertex
             #pragma fragment LitPassFragment
@@ -262,7 +265,7 @@ Shader "URP/Instanced/InstancedLit"
             #pragma instancing_options renderinglayer
             // Custom...
             #pragma multi_compile _ PROCEDURAL_INSTANCING_ON
-            #pragma shader_feature INSTANCED_COLOR
+            #pragma shader_feature_local INSTANCED_COLOR
 
             #pragma vertex LitGBufferPassVertex
             #pragma fragment LitGBufferPassFragment
@@ -638,5 +641,6 @@ Shader "URP/Instanced/InstancedLit"
     }
 
     FallBack "Hidden/Universal Render Pipeline/FallbackError"
-    CustomEditor "UnityEditor.Rendering.Universal.ShaderGUI.LitShader"
+    //CustomEditor "UnityEditor.Rendering.Universal.ShaderGUI.LitShader"
+    CustomEditor "Com.Rendering.Editor.InstancedLitShader"
 }

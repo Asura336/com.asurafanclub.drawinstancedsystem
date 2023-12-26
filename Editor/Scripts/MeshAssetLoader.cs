@@ -8,8 +8,10 @@ namespace Com.Rendering.Editor
 {
     internal class MeshAssetLoader
     {
-        public const string opaqueMaterialPath = EditorConstants.packagePath + "/Editor/Materials/BRP_Instanced_InstancedSimpleDiffuse.mat";
-        public const string transparentMaterialPath = EditorConstants.packagePath + "/Editor/Materials/BRP_Instanced_InstancedSimpleTransparent.mat";
+        public const string opaqueMaterialPath = EditorConstants.packagePath
+            + "/Editor/Materials/Lit_Instanced_Opaque.mat";
+        public const string transparentMaterialPath = EditorConstants.packagePath
+            + "/Editor/Materials/Lit_Instanced_Transparent.mat";
 
         public static Material MatchInstancedMaterial(Material src)
         {
@@ -20,7 +22,7 @@ namespace Com.Rendering.Editor
             var matAsset = AssetDatabase.LoadAssetAtPath<Material>(matAssetPath);
             Assert.IsTrue(matAsset, matAssetPath);
 
-            Material o = new Material(matAsset)
+            var o = new Material(matAsset)
             {
                 enableInstancing = false,  // using procedural instancing
                 mainTexture = src.mainTexture,
