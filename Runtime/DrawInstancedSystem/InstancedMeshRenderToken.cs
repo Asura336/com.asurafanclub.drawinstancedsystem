@@ -58,18 +58,18 @@ namespace Com.Rendering
             // 第一次，初始化缓冲区内容
             InitLocalOffsets();
         }
-        private void Dispatcher_OnBeforeDispatcherDisable(string dispatcherName)
+        private void Dispatcher_OnDispatcherEnabled(string dispatcherName)
         {
             Wakeup();
         }
-
-        private void Dispatcher_OnDispatcherEnabled(string dispatcherName)
+        private void Dispatcher_OnBeforeDispatcherDisable(string dispatcherName)
         {
             CheckDispatch();
         }
 
         private void OnEnable()
         {
+            UpdateLocalToWorld();
             Wakeup();
         }
 
