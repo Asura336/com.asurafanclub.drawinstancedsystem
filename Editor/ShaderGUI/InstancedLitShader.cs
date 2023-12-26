@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using UnityEditor;
 using UnityEditor.Rendering;
 using UnityEditor.Rendering.Universal.ShaderGUI;
@@ -73,9 +73,9 @@ namespace Com.Rendering.Editor
             // pass shader graph
             //...
 
-            // Ìæ»» GPU ÊµÀı»¯Ñ¡Ïî
+            // æ›¿æ¢ GPU å®ä¾‹åŒ–é€‰é¡¹
             //materialEditor.EnableInstancingField();
-            materialEditor.ShaderProperty(useColorBuffer, "Ê¹ÓÃÑÕÉ«»º³åÇø");
+            materialEditor.ShaderProperty(useColorBuffer, "ä½¿ç”¨é¢œè‰²ç¼“å†²åŒº");
         }
 
         public override void AssignNewShaderToMaterial(Material material, Shader oldShader, Shader newShader)

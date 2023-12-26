@@ -95,9 +95,7 @@ namespace Com.Rendering
         public InstancedMeshRenderSystem(Mesh mesh, Material mat, int batchSize) : this()
         {
             instanceMesh = mesh;
-            instandedMaterial = new Material(mat);
-            instandedMaterial.EnableKeyword("PROCEDURAL_INSTANCING_ON");
-            instandedMaterial.EnableKeyword("INSTANCED_COLOR");
+            instandedMaterial = mat;
             this.batchSize = batchSize;
         }
 
@@ -133,7 +131,6 @@ namespace Com.Rendering
             matricesBuffer = null;
             colorsBuffer?.Dispose();
             colorsBuffer = null;
-            Material.Destroy(instandedMaterial);
 
             release(batchLocalToWorldBuffer);
             release(batchLocalToWorldDirtyMask);

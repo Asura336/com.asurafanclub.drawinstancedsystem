@@ -11,6 +11,7 @@ namespace Com.Rendering
     /// 绘制实例的调度器，以名称索引，需要在初始化阶段主动构造。
     /// </summary>
     [AddComponentMenu("Com/Rendering/绘制实例调度器")]
+    [ExecuteInEditMode]
     public sealed class InstancedMeshRenderDispatcher : MonoBehaviour
     {
         static readonly Dictionary<string, InstancedMeshRenderDispatcher> sharedInstances =
@@ -374,15 +375,28 @@ namespace Com.Rendering
 
         private void Awake()
         {
+            if (!transform.parent && Application.isPlaying)
+            {
+                DontDestroyOnLoad(gameObject);
+            }
+        }
+
+        private void OnEnable()
+        {
             if (FindInstanceOrNothing(dispatcherName))
             {
                 throw new ArgumentException($"调度器 \"{dispatcherName}\" 名称冲突或者重复注册");
             }
             sharedInstances.Add(dispatcherName, this);
-            if (!transform.parent)
-            {
-                DontDestroyOnLoad(gameObject);
-            }
+            OnDispatcherEnabled?.Invoke(dispatcherName);
+            //print($"{dispatcherName} enabled");
+        }
+
+        private void OnDisable()
+        {
+            OnBeforeDispatcherDisable?.Invoke(dispatcherName);
+            sharedInstances.Remove(dispatcherName);
+            //print($"{dispatcherName} disabled");
         }
 
         private void OnDestroy()
@@ -473,5 +487,9 @@ namespace Com.Rendering
             get => recieveShadows;
             set => recieveShadows = value;
         }
+
+
+        public static event Action<string> OnDispatcherEnabled;
+        public static event Action<string> OnBeforeDispatcherDisable;
     }
 }

@@ -10,6 +10,8 @@ namespace Com.Rendering
     ///修改内容后由调度器再次分配。
     /// </summary>
     [AddComponentMenu("Com/Rendering/绘制实例符号")]
+    [DisallowMultipleComponent]
+    [ExecuteInEditMode]
     public sealed class InstancedMeshRenderToken : MonoBehaviour
     {
         const int defaultBufferSize = 64;
@@ -29,6 +31,11 @@ namespace Com.Rendering
         [SerializeField] int count;
 
         [SerializeField] int virtualBatchIndex;
+        /// <summary>
+        /// 不自动更新变换矩阵
+        /// </summary>
+        [SerializeField] bool transformStatic;
+        Matrix4x4 cachedLocalToWorld = Matrix4x4.identity;
 
         Transform cachedTransform;
         bool hasDestroyed;
@@ -37,44 +44,40 @@ namespace Com.Rendering
         bool materialPropertyUpdated;
 
         bool m_forceRenderingOff = false;
-
-        bool startMethodCalled = false;
         int m_bacthIndex = -1;
 
         private void Awake()
         {
+            InstancedMeshRenderDispatcher.OnDispatcherEnabled += Dispatcher_OnDispatcherEnabled;
+            InstancedMeshRenderDispatcher.OnBeforeDispatcherDisable += Dispatcher_OnBeforeDispatcherDisable;
+
             cachedTransform = transform;
             //batchSize = defaultBufferSize;
             Realloc(ref localOffsets, batchSize);
 
-            // 仅第一次，设置缓冲区内容
-            unsafe
-            {
-                fixed (Matrix4x4* pLocalOffs = localOffsets)
-                {
-                    var identity = Matrix4x4.identity;
-                    UnsafeUtility.MemCpyReplicate(pLocalOffs, &identity, sizeofFloat4x4, localOffsets.Length);
-                }
-            }
+            // 第一次，初始化缓冲区内容
+            InitLocalOffsets();
         }
-
-        private void Start()
+        private void Dispatcher_OnBeforeDispatcherDisable(string dispatcherName)
         {
             Wakeup();
-            startMethodCalled = true;
+        }
+
+        private void Dispatcher_OnDispatcherEnabled(string dispatcherName)
+        {
+            CheckDispatch();
         }
 
         private void OnEnable()
         {
-            if (startMethodCalled)
-            {
-                Wakeup();
-            }
+            Wakeup();
         }
 
         private void OnDestroy()
         {
             hasDestroyed = true;
+            InstancedMeshRenderDispatcher.OnDispatcherEnabled -= Dispatcher_OnDispatcherEnabled;
+            InstancedMeshRenderDispatcher.OnBeforeDispatcherDisable -= Dispatcher_OnBeforeDispatcherDisable;
         }
 
         private unsafe void OnDrawGizmosSelected()
@@ -134,7 +137,6 @@ namespace Com.Rendering
                 ? minBatchSize
                 : Mathf.Max(minBatchSize, CeilToPow2(count));
             // set dirty...
-            cachedTransform.hasChanged = true;
             instanceUpdated = true;
             volumeUpdated = true;
             materialPropertyUpdated = true;
@@ -144,6 +146,7 @@ namespace Com.Rendering
         private void OnDisable()
         {
             CheckDispatch();
+            BatchIndex = -1;  // reset anyway
         }
 
         /// <summary>
@@ -152,12 +155,46 @@ namespace Com.Rendering
         [ContextMenu("check")]
         public void CheckDispatch()
         {
+            if (Application.isEditor)
+            {
+                if (InstancedMeshRenderDispatcher.FindInstanceOrNothing(dispatcherName) == null)
+                {
+                    Debug.LogWarning($"调度器 \"{dispatcherName}\" 没有加入场景或者没有激活");
+                    return;
+                }
+            }
             InstancedMeshRenderDispatcher.Evaluate(this);
         }
 
         /// <summary>
-        /// 可以按序号读写某个实例的本地空间变换。
+        /// 将当前缓冲区内容置为 <see cref="Matrix4x4.identity"/>，
+        /// 可在调用此方法之前调整批次大小。
         ///写入值后要看到改动，需要手动调用 <see cref="UpdateLocalOffsets"/>
+        /// </summary>
+        public unsafe void InitLocalOffsets()
+        {
+            fixed (Matrix4x4* pLocalOffs = localOffsets)
+            {
+                var identity = Matrix4x4.identity;
+                UnsafeUtility.MemCpyReplicate(pLocalOffs, &identity, sizeofFloat4x4, localOffsets.Length);
+            }
+        }
+
+        /// <summary>
+        /// 设置此批次仅有一个实体，改动会立即生效，通常在编辑期间调用。
+        /// </summary>
+        public void MakeSingleInstance()
+        {
+            batchSize = 1;
+            count = 1;
+            InitLocalOffsets();
+            instanceUpdated = true;
+            CheckDispatch();
+        }
+
+        /// <summary>
+        /// 可以按序号读写某个实例的本地空间变换。
+        ///写入值后要看到改动，需要手动调用 <see cref="UpdateLocalOffsets"/> 和 <see cref="CheckDispatch"/>
         /// </summary>
         /// <param name="index"></param>
         /// <returns></returns>
@@ -217,7 +254,7 @@ namespace Com.Rendering
 
         /// <summary>
         /// 绘制的实例个数。绘制的网格和材质取决于调度器持有的网格和材质。
-        ///写入值后要看到改动，需要手动调用 <see cref="UpdateLocalOffsets"/>
+        ///写入值后要看到改动，需要手动调用 <see cref="CheckDispatch"/>
         /// </summary>
         public int Count
         {
@@ -244,12 +281,40 @@ namespace Com.Rendering
         /// </summary>
         public int BatchSize => batchSize;
 
-        public int Capacity => localOffsets?.Length ?? 0;
+        public bool IsSingleInstance => batchSize == 1 && count == 1
+            && Capacity > 0 && EqualsMatrix4x4(localOffsets[0], Matrix4x4.identity);
 
-        public Matrix4x4 LocalToWorld => cachedTransform.localToWorldMatrix;
+        public int Capacity => localOffsets?.Length ?? 0;
+        /// <summary>
+        /// 不自动更新变换矩阵
+        /// </summary>
+        public bool TransformStatic
+        {
+            get => transformStatic; set
+            {
+                transformStatic = value;
+                if (!value)
+                {
+                    cachedLocalToWorld = cachedTransform.localToWorldMatrix;
+                }
+            }
+        }
+        public void UpdateLocalToWorld()
+        {
+            if (transformStatic)
+            {
+                cachedLocalToWorld = cachedTransform.localToWorldMatrix;
+            }
+        }
+
+        public Matrix4x4 LocalToWorld => transformStatic
+            ? cachedLocalToWorld
+            : cachedLocalToWorld = cachedTransform.localToWorldMatrix;
         public void GetLocalToWorld(ref Matrix4x4 localToWorld)
         {
-            localToWorld = cachedTransform.localToWorldMatrix;
+            localToWorld = transformStatic
+            ? cachedLocalToWorld
+            : cachedLocalToWorld = cachedTransform.localToWorldMatrix;
         }
 
         /// <summary>
