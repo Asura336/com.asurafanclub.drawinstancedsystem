@@ -10,6 +10,8 @@ using static Unity.Mathematics.math;
 
 namespace Com.Rendering
 {
+    [BurstCompile(CompileSynchronously = true,
+        FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
     internal static class DrawInstancedSystemTools
     {
         public const int sizeofFloat4 = sizeof(float) * 4;
@@ -90,18 +92,16 @@ namespace Com.Rendering
             *seed ^= *(int*)&v;
         }
 
+        [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe bool EqualsBounds(Bounds* a, Bounds* b)
+        public static unsafe bool EqualsBounds([NoAlias] Bounds* a, [NoAlias] Bounds* b)
         {
-            ulong* pa = (ulong*)a, pb = (ulong*)b;
-            // Bounds 相当于 6 个 float
-            for (int i = 0; i < 3; i++)
-            {
-                if (pa[i] != pb[i]) { return false; }
-            }
-            return true;
+            var aa = (float3x2*)a;
+            var bb = (float3x2*)b;
+            return aa->c0.Equals(bb->c0) && aa->c1.Equals(bb->c1);
         }
 
+        [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool EqualsColor(in Color lhs, in Color rhs)
         {
@@ -113,6 +113,7 @@ namespace Com.Rendering
             return num5 < 9.99999944E-11f;
         }
 
+        [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe bool EqualsMatrix4x4(in Matrix4x4 lhs, in Matrix4x4 rhs)
         {

@@ -38,7 +38,6 @@ namespace Com.Rendering
         Matrix4x4 cachedLocalToWorld = Matrix4x4.identity;
 
         Transform cachedTransform;
-        bool hasDestroyed;
         bool instanceUpdated;
         bool volumeUpdated;
         bool materialPropertyUpdated;
@@ -60,10 +59,12 @@ namespace Com.Rendering
         }
         private void Dispatcher_OnDispatcherEnabled(string dispatcherName)
         {
+            print($"{gameObject.name} listened {dispatcherName} enabled");
             Wakeup();
         }
         private void Dispatcher_OnBeforeDispatcherDisable(string dispatcherName)
         {
+            print($"{gameObject.name} listened {dispatcherName} disabled");
             CheckDispatch();
         }
 
@@ -75,7 +76,6 @@ namespace Com.Rendering
 
         private void OnDestroy()
         {
-            hasDestroyed = true;
             InstancedMeshRenderDispatcher.OnDispatcherEnabled -= Dispatcher_OnDispatcherEnabled;
             InstancedMeshRenderDispatcher.OnBeforeDispatcherDisable -= Dispatcher_OnBeforeDispatcherDisable;
         }
@@ -146,7 +146,6 @@ namespace Com.Rendering
         private void OnDisable()
         {
             CheckDispatch();
-            BatchIndex = -1;  // reset anyway
         }
 
         /// <summary>
@@ -304,6 +303,13 @@ namespace Com.Rendering
             if (transformStatic)
             {
                 cachedLocalToWorld = cachedTransform.localToWorldMatrix;
+            }
+        }
+        public void UpdateLocalToWorld(in Matrix4x4 localToWorld)
+        {
+            if (transformStatic)
+            {
+                cachedLocalToWorld = localToWorld;
             }
         }
 

@@ -9,7 +9,7 @@ namespace Com.Rendering.Editor
 {
     public class PrefabConverterWindow : EditorWindow
     {
-        [MenuItem("Tools/Prefab/为预制体应用绘制实例符号")]
+        [MenuItem("绘制实例系统/Prefab/为预制体应用绘制实例符号")]
         public static void ShowExample()
         {
             PrefabConverterWindow wnd = GetWindow<PrefabConverterWindow>();

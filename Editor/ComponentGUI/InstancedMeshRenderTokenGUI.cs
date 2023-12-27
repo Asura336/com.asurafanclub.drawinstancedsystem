@@ -60,6 +60,28 @@ namespace Com.Rendering.Editor
             }
             EditorGUILayout.PropertyField(color, new GUIContent("此批次的颜色"));
             EditorGUILayout.PropertyField(localBounds, new GUIContent("本地包围盒需要包住此批次的所有实例"));
+            EditorGUILayout.PropertyField(batchSize, new GUIContent("预期分配的变换矩阵缓冲区长度"));
+
+            if (targets.OfType<InstancedMeshRenderToken>().Any(t => !t.IsSingleInstance))
+            {
+                GUILayout.Space(10);
+                if (GUILayout.Button("设置为单实例"))
+                {
+                    foreach (var t in targets.OfType<InstancedMeshRenderToken>())
+                    {
+                        t.MakeSingleInstance();
+                    }
+                }
+            }
+
+            if (GUILayout.Button("应用改动"))
+            {
+                foreach (var t in targets.OfType<InstancedMeshRenderToken>())
+                {
+                    t.CheckDispatch();
+                }
+            }
+
             EditorGUILayout.PropertyField(transformStatic, new GUIContent("停止自动更新位置"));
             if (transformStatic.hasMultipleDifferentValues
                || transformStatic.boolValue)
@@ -73,23 +95,8 @@ namespace Com.Rendering.Editor
                 }
             }
 
-            EditorGUILayout.PropertyField(batchSize, new GUIContent("预期分配的变换矩阵缓冲区长度"));
-
             LabelLine("此批次绘制的实例数：", count.intValue.ToString());
             LabelLine("此批次的 id：", virtualBatchIndex.intValue.ToString());
-
-
-            if (targets.OfType<InstancedMeshRenderToken>().Any(t => !t.IsSingleInstance))
-            {
-                GUILayout.Space(10);
-                if (GUILayout.Button("设置为单实例"))
-                {
-                    foreach (var t in targets.OfType<InstancedMeshRenderToken>())
-                    {
-                        t.MakeSingleInstance();
-                    }
-                }
-            }
 
             serializedObject.ApplyModifiedProperties();
         }
