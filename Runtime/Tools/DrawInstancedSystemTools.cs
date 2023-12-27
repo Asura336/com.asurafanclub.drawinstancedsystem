@@ -15,11 +15,11 @@ namespace Com.Rendering
     internal static class DrawInstancedSystemTools
     {
         public const int sizeofFloat4 = sizeof(float) * 4;
-        public const int sizeofFloat3x4 = sizeof(float) * 12;
         public const int sizeofFloat4x4 = sizeof(float) * 16;
         public static readonly int id_Color = Shader.PropertyToID("_BaseColor");
         public static readonly int id_Colors = Shader.PropertyToID("_BaseColors");
-        public static readonly int id_Matrices = Shader.PropertyToID("_Matrices");
+        public static readonly int id_LocalToWorldBuffer = Shader.PropertyToID("_LocalToWorldBuffer");
+        public static readonly int id_WorldToLocalBuffer = Shader.PropertyToID("_WorldToLocalBuffer");
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -28,12 +28,6 @@ namespace Com.Rendering
             var dstHandle = dst.BeginWrite<T>(0, length);
             UnsafeUtility.MemCpy(dstHandle.GetUnsafePtr(), src.GetUnsafeReadOnlyPtr(), length * sizeT);
             dst.EndWrite<T>(length);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void SetData(ComputeBuffer dst, NativeArray<float3x4> src, int length)
-        {
-            SetData(dst, src, length, sizeofFloat3x4);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -130,6 +124,7 @@ namespace Com.Rendering
             else if (dst.Length != size) { Array.Resize(ref dst, size); }
         }
 
+        [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void MultiplyPoint3x4(this in Matrix4x4 mul, in Vector3 point, ref Vector3 result)
         {
@@ -138,6 +133,7 @@ namespace Com.Rendering
             result.z = mul.m20 * point.x + mul.m21 * point.y + mul.m22 * point.z + mul.m23;
         }
 
+        [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe static void GetBoundsVerticesUnsafe(this in Bounds b, in Vector3* vector8)
         {
@@ -151,21 +147,14 @@ namespace Com.Rendering
             float minY = min.y; float maxY = max.y;
             float minZ = min.z; float maxZ = max.z;
 
-            vector3((float*)vector8, min.x, min.y, min.z);
-            vector3((float*)(vector8 + 1), min.x, min.y, max.z);
-            vector3((float*)(vector8 + 2), min.x, max.y, min.z);
-            vector3((float*)(vector8 + 3), min.x, max.y, max.z);
-            vector3((float*)(vector8 + 4), max.x, min.y, min.z);
-            vector3((float*)(vector8 + 5), max.x, min.y, max.z);
-            vector3((float*)(vector8 + 6), max.x, max.y, min.z);
-            vector3((float*)(vector8 + 7), max.x, max.y, max.z);
-
-            static unsafe void vector3(float* o, float x, float y, float z)
-            {
-                o[0] = x;
-                o[1] = y;
-                o[2] = z;
-            }
+            vector8[0] = float3(min.x, min.y, min.z);
+            vector8[1] = float3(min.x, min.y, max.z);
+            vector8[2] = float3(min.x, max.y, min.z);
+            vector8[3] = float3(min.x, max.y, max.z);
+            vector8[4] = float3(max.x, min.y, min.z);
+            vector8[5] = float3(max.x, min.y, max.z);
+            vector8[6] = float3(max.x, max.y, min.z);
+            vector8[7] = float3(max.x, max.y, max.z);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -241,7 +230,8 @@ namespace Com.Rendering
             [NativeDisableParallelForRestriction]
             [ReadOnly] public NativeArray<int>.ReadOnly batchCount;
             [ReadOnly] public NativeArray<float4x4>.ReadOnly instLocalOffset;
-            [WriteOnly] public NativeList<float4x4>.ParallelWriter instTrs;
+            [WriteOnly] public NativeList<float4x4>.ParallelWriter instLocalToWorld;
+            [WriteOnly] public NativeList<float4x4>.ParallelWriter instWorldToLocal;
 
             public unsafe void Execute(int index)
             {
@@ -251,12 +241,15 @@ namespace Com.Rendering
                 {
                     if (batchLocalToWorldDirty[batchIndex])
                     {
-                        (*instTrs.ListData)[index] = mul(batchLocalToWorld[batchIndex], instLocalOffset[index]);
+                        var localToWorld = mul(batchLocalToWorld[batchIndex], instLocalOffset[index]);
+                        (*instLocalToWorld.ListData)[index] = localToWorld;
+                        (*instWorldToLocal.ListData)[index] = inverse(localToWorld);
                     }
                 }
                 else
                 {
-                    (*instTrs.ListData)[index] = 0;
+                    (*instLocalToWorld.ListData)[index] = 0;
+                    (*instWorldToLocal.ListData)[index] = 0;
                 }
             }
         }

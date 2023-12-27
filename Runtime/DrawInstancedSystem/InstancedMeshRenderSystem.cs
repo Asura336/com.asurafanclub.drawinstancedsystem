@@ -61,7 +61,12 @@ namespace Com.Rendering
         ///因为内存排列上按定长度分片，不是所有的成员都代表有效值，用零值的变换表示无效值，
         ///在着色器里判断矩阵的最后一列（行）是 (0,0,0,0) 还是 (0,0,0,1) 略麻烦，不用传递 3x4 矩阵的优化做法。
         /// </summary>
-        NativeList<float4x4> instanceTrsBuffer;
+        NativeList<float4x4> instanceLocalToWorldBuffer;
+        /// <summary>
+        /// [job system output] 所有 instance 的世界空间到本地空间变换。
+        /// 缓存这个变换，移除物体时可以不重计算变换。
+        /// </summary>
+        NativeList<float4x4> instanceWorldToLocalBuffer;
 
         /// <summary>
         /// 所有 keeper 持有的实例的颜色
@@ -78,7 +83,8 @@ namespace Com.Rendering
         Bounds cachedWorldBounds;
 
         readonly MaterialPropertyBlock props;
-        ComputeBuffer matricesBuffer;
+        ComputeBuffer loadlToWorldBuffer;
+        ComputeBuffer worldToLocalBuffer;
         ComputeBuffer colorsBuffer;
         public readonly Material instandedMaterial;
 
@@ -127,8 +133,10 @@ namespace Com.Rendering
             }
 
             // unmanaged
-            matricesBuffer?.Dispose();
-            matricesBuffer = null;
+            loadlToWorldBuffer?.Dispose();
+            loadlToWorldBuffer = null;
+            worldToLocalBuffer?.Dispose();
+            worldToLocalBuffer = null;
             colorsBuffer?.Dispose();
             colorsBuffer = null;
 
@@ -137,7 +145,8 @@ namespace Com.Rendering
             release(batchCountBuffer);
 
             release(instanceLocalOffsetBuffer);
-            release(instanceTrsBuffer);
+            release(instanceLocalToWorldBuffer);
+            release(instanceWorldToLocalBuffer);
             release(batchLocalBoundsBuffer);
             release(instanceColorsBuffer);
 
@@ -183,11 +192,13 @@ namespace Com.Rendering
                         batchLocalToWorldDirty = batchLocalToWorldDirtyMask.AsParallelReader(),
                         batchCount = batchCountBuffer.AsParallelReader(),
                         instLocalOffset = instanceLocalOffsetBuffer.AsParallelReader(),
-                        instTrs = instanceTrsBuffer.AsParallelWriter()
+                        instLocalToWorld = instanceLocalToWorldBuffer.AsParallelWriter(),
+                        instWorldToLocal = instanceWorldToLocalBuffer.AsParallelWriter(),
                     }.Schedule(instanceNumber, 64, default).Complete();
 
                     //matricesBuffer.SetData(outputTrs);
-                    SetData(matricesBuffer, instanceTrsBuffer.AsArray(), instanceNumber);
+                    SetData(loadlToWorldBuffer, instanceLocalToWorldBuffer.AsArray(), instanceNumber);
+                    SetData(worldToLocalBuffer, instanceWorldToLocalBuffer.AsArray(), instanceNumber);
                 }
 
                 // 移动了物体，或者有物体改变包围盒尺寸
@@ -264,7 +275,8 @@ namespace Com.Rendering
                 // grows up
                 Realloc(ref instanceLocalOffsetBuffer, instanceCapacity);
                 Realloc(ref instanceColorsBuffer, instanceCapacity);
-                Realloc(ref instanceTrsBuffer, instanceCapacity);
+                Realloc(ref instanceLocalToWorldBuffer, instanceCapacity);
+                Realloc(ref instanceWorldToLocalBuffer, instanceCapacity);
 
                 Realloc(ref batchLocalToWorldBuffer, capacity);
                 Realloc(ref batchLocalToWorldDirtyMask, capacity);
@@ -273,10 +285,14 @@ namespace Com.Rendering
                 Realloc(ref batchLocalBoundsBuffer, capacity);
 
                 // 重分配，附加缓冲区
-                matricesBuffer?.Dispose();
-                matricesBuffer = new ComputeBuffer(instanceCapacity, sizeofFloat4x4,
+                loadlToWorldBuffer?.Dispose();
+                loadlToWorldBuffer = new ComputeBuffer(instanceCapacity, sizeofFloat4x4,
                     ComputeBufferType.Structured, ComputeBufferMode.SubUpdates);
-                props.SetBuffer(id_Matrices, matricesBuffer);
+                props.SetBuffer(id_LocalToWorldBuffer, loadlToWorldBuffer);
+                worldToLocalBuffer?.Dispose();
+                worldToLocalBuffer = new ComputeBuffer(instanceCapacity, sizeofFloat4x4,
+                    ComputeBufferType.Structured, ComputeBufferMode.SubUpdates);
+                props.SetBuffer(id_WorldToLocalBuffer, worldToLocalBuffer);
 
                 colorsBuffer?.Dispose();
                 colorsBuffer = new ComputeBuffer(instanceCapacity, sizeofFloat4,
@@ -457,7 +473,8 @@ namespace Com.Rendering
                 int lastIdx = i + instanceNumber;
                 Erase(instanceLocalOffsetBuffer, removeIdx, lastIdx);
                 Erase(instanceColorsBuffer, removeIdx, lastIdx);
-                Erase(instanceTrsBuffer, removeIdx, lastIdx);
+                Erase(instanceLocalToWorldBuffer, removeIdx, lastIdx);
+                Erase(instanceWorldToLocalBuffer, removeIdx, lastIdx);
             }
             //instanceLocalOffsetDirty = true;
 
@@ -472,9 +489,11 @@ namespace Com.Rendering
                 + UsedMemory(batchCountBuffer)
                 + UsedMemory(batchLocalBoundsBuffer)
                 + UsedMemory(instanceLocalOffsetBuffer)
-                + UsedMemory(instanceTrsBuffer)
+                + UsedMemory(instanceLocalToWorldBuffer)
+                + UsedMemory(instanceWorldToLocalBuffer)
                 + UsedMemory(instanceColorsBuffer)
-                + UsedMemory(matricesBuffer)
+                + UsedMemory(loadlToWorldBuffer)
+                + UsedMemory(worldToLocalBuffer)
                 + UsedMemory(colorsBuffer);
         }
 
