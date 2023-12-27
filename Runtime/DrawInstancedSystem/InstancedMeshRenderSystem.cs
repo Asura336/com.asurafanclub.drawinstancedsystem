@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -32,6 +33,8 @@ namespace Com.Rendering
             && batchNumber > -1
             && instanceNumber == batchNumber * batchSize;
 
+        int visibleNumber = 0;
+
         /// <summary>
         /// [job system input] 所有 batch 的基点变换
         /// </summary>
@@ -56,7 +59,12 @@ namespace Com.Rendering
         NativeList<float4x4> instanceLocalOffsetBuffer;
 
         /// <summary>
-        /// [job system output] 所有 instance 的世界空间变换。
+        /// [job system output] 标记计划渲染的 instance
+        /// </summary>
+        NativeList<bool> instanceVisibleBuffer;
+
+        /// <summary>
+        /// [job system output] 所有 instance 的本地空间到世界空间变换。
         ///缓存这个变换，移除物体时可以不重计算变换。
         ///因为内存排列上按定长度分片，不是所有的成员都代表有效值，用零值的变换表示无效值，
         ///在着色器里判断矩阵的最后一列（行）是 (0,0,0,0) 还是 (0,0,0,1) 略麻烦，不用传递 3x4 矩阵的优化做法。
@@ -71,21 +79,35 @@ namespace Com.Rendering
         /// <summary>
         /// 所有 keeper 持有的实例的颜色
         /// </summary>
-        NativeList<float4> instanceColorsBuffer;
+        NativeList<float4> instanceColorBuffer;
+
+        /// <summary>
+        /// [job system output] 所有有效的 instane 本地空间到世界空间变换
+        /// </summary>
+        NativeList<float4x4> instanceLocalToWorldIndirectBuffer;
+        /// <summary>
+        /// [job system output] 所有有效的 instane 世界空间到本地空间变换
+        /// </summary>
+        NativeList<float4x4> instanceWorldToLocalIndirectBuffer;
+        /// <summary>
+        /// [job system output] 所有有效的 instane 颜色
+        /// </summary>
+        NativeList<float4> instanceColorIndirectBuffer;
 
         bool _disposed;
 
         bool instanceLocalOffsetDirty;
         bool instanceColorDirty;
+        bool instanceVisibleDirty;
         bool batchLocalToWorldDirty;
         bool batchLocalBoundsDirty;
 
         Bounds cachedWorldBounds;
 
         readonly MaterialPropertyBlock props;
-        ComputeBuffer loadlToWorldBuffer;
-        ComputeBuffer worldToLocalBuffer;
-        ComputeBuffer colorsBuffer;
+        GraphicsBuffer loadlToWorldBuffer;
+        GraphicsBuffer worldToLocalBuffer;
+        GraphicsBuffer colorsBuffer;
         public readonly Material instandedMaterial;
 
         public ShadowCastingMode shadowCastingMode = ShadowCastingMode.On;
@@ -133,6 +155,7 @@ namespace Com.Rendering
                 // managed
                 batchNumber = 0;
                 instanceNumber = 0;
+                visibleNumber = 0;
             }
 
             // unmanaged
@@ -148,10 +171,15 @@ namespace Com.Rendering
             release(batchCountBuffer);
 
             release(instanceLocalOffsetBuffer);
+            release(instanceVisibleBuffer);
             release(instanceLocalToWorldBuffer);
             release(instanceWorldToLocalBuffer);
             release(batchLocalBoundsBuffer);
-            release(instanceColorsBuffer);
+            release(instanceColorBuffer);
+
+            release(instanceLocalToWorldIndirectBuffer);
+            release(instanceWorldToLocalIndirectBuffer);
+            release(instanceColorIndirectBuffer);
 
             _disposed = true;
 
@@ -197,11 +225,10 @@ namespace Com.Rendering
                         instLocalOffset = instanceLocalOffsetBuffer.AsParallelReader(),
                         instLocalToWorld = instanceLocalToWorldBuffer.AsParallelWriter(),
                         instWorldToLocal = instanceWorldToLocalBuffer.AsParallelWriter(),
+                        instVisible = instanceVisibleBuffer.AsParallelWriter(),
                     }.Schedule(instanceNumber, 64, default).Complete();
 
-                    //matricesBuffer.SetData(outputTrs);
-                    SetData(loadlToWorldBuffer, instanceLocalToWorldBuffer.AsArray(), instanceNumber);
-                    SetData(worldToLocalBuffer, instanceWorldToLocalBuffer.AsArray(), instanceNumber);
+                    instanceVisibleDirty = true;
                 }
 
                 // 移动了物体，或者有物体改变包围盒尺寸
@@ -253,13 +280,70 @@ namespace Com.Rendering
                 UnsafeUtility.MemClear(batchLocalToWorldDirtyMask.GetUnsafePtr(), batchNumber);
             }
 
+            if (instanceVisibleDirty)
+            {
+                CopyIndirectMatrixBuffer(instanceNumber, instanceVisibleBuffer.GetUnsafePtr(),
+                    instanceLocalToWorldBuffer.GetUnsafePtr(),
+                    instanceWorldToLocalBuffer.GetUnsafePtr(),
+                    ref visibleNumber,
+                    instanceLocalToWorldIndirectBuffer.GetUnsafePtr(),
+                    instanceWorldToLocalIndirectBuffer.GetUnsafePtr());
+
+                SetData(loadlToWorldBuffer, instanceLocalToWorldIndirectBuffer.AsArray(), visibleNumber);
+                SetData(worldToLocalBuffer, instanceWorldToLocalIndirectBuffer.AsArray(), visibleNumber);
+
+                instanceVisibleDirty = false;
+
+                // 序列变化过
+                instanceColorDirty = true;
+            }
+
             if (instanceColorDirty)
             {
-                SetData(colorsBuffer, instanceColorsBuffer.AsArray(), instanceNumber);
+                CopyIndirectColorBuffer(instanceNumber, instanceVisibleBuffer.GetUnsafePtr(),
+                     instanceColorBuffer.GetUnsafePtr(), instanceColorIndirectBuffer.GetUnsafePtr());
+                SetData(colorsBuffer, instanceColorIndirectBuffer.AsArray(), visibleNumber);
                 instanceColorDirty = false;
             }
 
             DrawMesh();
+        }
+        [BurstCompile]
+        static unsafe void CopyIndirectMatrixBuffer(int length,
+            [NoAlias] bool* visible,
+            [NoAlias] float4x4* localToWorld,
+            [NoAlias] float4x4* worldToLocal,
+
+            ref int counter,
+            [NoAlias] float4x4* localToWorldIndirect,
+            [NoAlias] float4x4* worldToLocalIndirect)
+        {
+            counter = 0;
+            for (int i = 0; i < length; i++)
+            {
+                if (visible[i])
+                {
+                    localToWorldIndirect[counter] = localToWorld[i];
+                    worldToLocalIndirect[counter] = worldToLocal[i];
+                    counter++;
+                }
+            }
+        }
+        [BurstCompile]
+        static unsafe void CopyIndirectColorBuffer(int length,
+           [NoAlias] bool* visible,
+           [NoAlias] float4* color,
+           [NoAlias] float4* colorIndirect)
+        {
+            int counter = 0;
+            for (int i = 0; i < length; i++)
+            {
+                if (visible[i])
+                {
+                    colorIndirect[counter] = color[i];
+                    counter++;
+                }
+            }
         }
 
         /// <summary>
@@ -276,9 +360,14 @@ namespace Com.Rendering
             {
                 // grows up
                 Realloc(ref instanceLocalOffsetBuffer, instanceCapacity);
-                Realloc(ref instanceColorsBuffer, instanceCapacity);
+                Realloc(ref instanceVisibleBuffer, instanceCapacity);
                 Realloc(ref instanceLocalToWorldBuffer, instanceCapacity);
                 Realloc(ref instanceWorldToLocalBuffer, instanceCapacity);
+                Realloc(ref instanceColorBuffer, instanceCapacity);
+
+                Realloc(ref instanceLocalToWorldIndirectBuffer, instanceCapacity);
+                Realloc(ref instanceWorldToLocalIndirectBuffer, instanceCapacity);
+                Realloc(ref instanceColorIndirectBuffer, instanceCapacity);
 
                 Realloc(ref batchLocalToWorldBuffer, capacity);
                 Realloc(ref batchLocalToWorldDirtyMask, capacity);
@@ -288,17 +377,17 @@ namespace Com.Rendering
 
                 // 重分配，附加缓冲区
                 loadlToWorldBuffer?.Dispose();
-                loadlToWorldBuffer = new ComputeBuffer(instanceCapacity, sizeofFloat4x4,
-                    ComputeBufferType.Structured, ComputeBufferMode.SubUpdates);
+                loadlToWorldBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                    instanceCapacity, sizeofFloat4x4);
                 props.SetBuffer(id_LocalToWorldBuffer, loadlToWorldBuffer);
                 worldToLocalBuffer?.Dispose();
-                worldToLocalBuffer = new ComputeBuffer(instanceCapacity, sizeofFloat4x4,
-                    ComputeBufferType.Structured, ComputeBufferMode.SubUpdates);
+                worldToLocalBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                    instanceCapacity, sizeofFloat4x4);
                 props.SetBuffer(id_WorldToLocalBuffer, worldToLocalBuffer);
 
                 colorsBuffer?.Dispose();
-                colorsBuffer = new ComputeBuffer(instanceCapacity, sizeofFloat4,
-                    ComputeBufferType.Structured, ComputeBufferMode.SubUpdates);
+                colorsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                    instanceCapacity, sizeofFloat4);
                 props.SetBuffer(id_Colors, colorsBuffer);
             }
 
@@ -435,7 +524,7 @@ namespace Com.Rendering
         public unsafe void WriteBatchColorAt(int index, in Color color)
         {
             int start = batchSize * index;
-            var ptr = (Color*)instanceColorsBuffer.GetUnsafePtr();
+            var ptr = (Color*)instanceColorBuffer.GetUnsafePtr();
             fixed (Color* pColor = &color)
             {
                 UnsafeUtility.MemCpyReplicate(ptr + start, pColor, sizeofFloat4, batchSize);
@@ -451,7 +540,7 @@ namespace Com.Rendering
         /// <param name="color"></param>
         public unsafe void WriteInstanceColorAt(int batchIndex, int indexOffset, in Color color)
         {
-            var ptr = (Color*)instanceColorsBuffer.GetUnsafePtr();
+            var ptr = (Color*)instanceColorBuffer.GetUnsafePtr();
             ptr[batchSize * batchIndex + indexOffset] = color;
         }
 
@@ -466,7 +555,7 @@ namespace Com.Rendering
             //batchLocalToWorldDirty = true;
 
             Erase(batchLocalBoundsBuffer, batchIndex, batchNumber);
-            //batchLocalBoundsDirty = true;
+            batchLocalBoundsDirty = true;
 
             int instanceStart = batchIndex * batchSize;
             for (int i = 0; i < batchSize; i++)
@@ -474,14 +563,12 @@ namespace Com.Rendering
                 int removeIdx = i + instanceStart;
                 int lastIdx = i + instanceNumber;
                 Erase(instanceLocalOffsetBuffer, removeIdx, lastIdx);
-                Erase(instanceColorsBuffer, removeIdx, lastIdx);
+                Erase(instanceColorBuffer, removeIdx, lastIdx);
                 Erase(instanceLocalToWorldBuffer, removeIdx, lastIdx);
                 Erase(instanceWorldToLocalBuffer, removeIdx, lastIdx);
             }
-            //instanceLocalOffsetDirty = true;
-
-            // index changed...
-            // batchNumber => batchIndex
+            // 序列变化了
+            instanceVisibleDirty = true;
         }
 
         public long UsedBufferMemory()
@@ -490,10 +577,16 @@ namespace Com.Rendering
                 + UsedMemory(batchLocalToWorldDirtyMask)
                 + UsedMemory(batchCountBuffer)
                 + UsedMemory(batchLocalBoundsBuffer)
+
                 + UsedMemory(instanceLocalOffsetBuffer)
                 + UsedMemory(instanceLocalToWorldBuffer)
                 + UsedMemory(instanceWorldToLocalBuffer)
-                + UsedMemory(instanceColorsBuffer)
+                + UsedMemory(instanceColorBuffer)
+
+                + UsedMemory(instanceLocalToWorldIndirectBuffer)
+                + UsedMemory(instanceWorldToLocalIndirectBuffer)
+                + UsedMemory(instanceColorIndirectBuffer)
+
                 + UsedMemory(loadlToWorldBuffer)
                 + UsedMemory(worldToLocalBuffer)
                 + UsedMemory(colorsBuffer);
@@ -516,20 +609,20 @@ namespace Com.Rendering
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void DrawMesh()
         {
-            if (instanceNumber < 1) { return; }
+            if (visibleNumber < 1) { return; }
 
             var renderParams = GetRenderParams(null);
 
             int subMeshCount = instanceMesh.subMeshCount;
             if (subMeshCount == 1)
             {
-                Graphics.RenderMeshPrimitives(renderParams, instanceMesh, 0, instanceNumber);
+                Graphics.RenderMeshPrimitives(renderParams, instanceMesh, 0, visibleNumber);
             }
             else
             {
                 for (int i = 0; i < subMeshCount; i++)
                 {
-                    Graphics.RenderMeshPrimitives(renderParams, instanceMesh, i, instanceNumber);
+                    Graphics.RenderMeshPrimitives(renderParams, instanceMesh, i, visibleNumber);
                 }
             }
         }
@@ -552,19 +645,19 @@ namespace Com.Rendering
             lightProbeUsage = lightProbeUsage,
         };
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void Draw(int subMeshIndex)
-        {
-            var worldBounds = cachedWorldBounds;
-            Graphics.DrawMeshInstancedProcedural(instanceMesh,
-                subMeshIndex,
-                instandedMaterial,
-                worldBounds,
-                instanceNumber,
-                props,
-                shadowCastingMode,
-                recieveShadows,
-                layer);
-        }
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //void Draw(int subMeshIndex)
+        //{
+        //    var worldBounds = cachedWorldBounds;
+        //    Graphics.DrawMeshInstancedProcedural(instanceMesh,
+        //        subMeshIndex,
+        //        instandedMaterial,
+        //        worldBounds,
+        //        visibleNumber,
+        //        props,
+        //        shadowCastingMode,
+        //        recieveShadows,
+        //        layer);
+        //}
     }
 }

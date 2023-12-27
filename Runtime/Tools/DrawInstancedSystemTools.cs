@@ -43,6 +43,12 @@ namespace Com.Rendering
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void SetData<T>(GraphicsBuffer dst, NativeArray<T> src, int length) where T : unmanaged
+        {
+            dst.SetData(src, 0, 0, length);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void Erase<T>(NativeArray<T> buffer, int index, int last) where T : unmanaged
         {
             //buffer[index] = buffer[last];
@@ -72,6 +78,12 @@ namespace Com.Rendering
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe long UsedMemory(ComputeBuffer buffer)
+        {
+            return buffer is null ? 0 : buffer.count * buffer.stride;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe long UsedMemory(GraphicsBuffer buffer)
         {
             return buffer is null ? 0 : buffer.count * buffer.stride;
         }
@@ -232,6 +244,7 @@ namespace Com.Rendering
             [ReadOnly] public NativeArray<float4x4>.ReadOnly instLocalOffset;
             [WriteOnly] public NativeList<float4x4>.ParallelWriter instLocalToWorld;
             [WriteOnly] public NativeList<float4x4>.ParallelWriter instWorldToLocal;
+            [WriteOnly] public NativeList<bool>.ParallelWriter instVisible;
 
             public unsafe void Execute(int index)
             {
@@ -245,11 +258,13 @@ namespace Com.Rendering
                         (*instLocalToWorld.ListData)[index] = localToWorld;
                         (*instWorldToLocal.ListData)[index] = inverse(localToWorld);
                     }
+                        (*instVisible.ListData)[index] = true;
                 }
                 else
                 {
                     (*instLocalToWorld.ListData)[index] = 0;
                     (*instWorldToLocal.ListData)[index] = 0;
+                    (*instVisible.ListData)[index] = false;
                 }
             }
         }

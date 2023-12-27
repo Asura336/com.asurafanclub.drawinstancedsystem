@@ -249,6 +249,10 @@ namespace Com.Rendering
             {
                 DontDestroyOnLoad(gameObject);
             }
+
+#if UNITY_EDITOR
+            ListenSharedPlayModeStateChangeCallback();
+#endif
         }
 
         private void OnEnable()
@@ -406,6 +410,11 @@ namespace Com.Rendering
         }
         SystemWithTokens GetSystemAtLevel(int level)
         {
+            if (!this)
+            {
+                Debug.LogWarning("self will be destroy");
+                return null;
+            }
             if (levels[level] is null)
             {
                 int batchSize = batchSizeLevels[level];
@@ -481,7 +490,6 @@ namespace Com.Rendering
                 {
                     throw new MissingReferenceException($"没有找到调度器 \"{token.DispatcherName}\"");
                 }
-
                 if (exist && thisTokenInfo.Equals(savedInfo))
                 {
                     WriteToRenderSystem(savedInfo.savedDispatcher.levels[savedInfo.systemLevel].system,
@@ -557,20 +565,9 @@ namespace Com.Rendering
         [UnityEditor.MenuItem("绘制实例系统/重启当前场景的组件")]
         public static void RestartGlobal()
         {
-            var allDispatchers = FindObjectsByType<InstancedMeshRenderDispatcher>(
-                FindObjectsInactive.Include, FindObjectsSortMode.None);
-            // clear
-            for (int i = allDispatchers.Length - 1; i >= 0; i--)
-            {
-                var levels = allDispatchers[i].levels;
-                for (int j = levels.Length - 1; j >= 0; j--)
-                {
-                    levels[j]?.Dispose();
-                    levels[j] = null;
-                }
-            }
-            sharedInstances.Clear();
-            savedTokenInfos.Clear();
+            ClearGlobal(out var allDispatchers);
+
+            // 重新注册
             for (int i = 0; i < allDispatchers.Length; i++)
             {
                 var currDispatcher = allDispatchers[i];
@@ -589,6 +586,7 @@ namespace Com.Rendering
                 }
             }
 
+            // 重新添加
             var allTokens = FindObjectsByType<InstancedMeshRenderToken>(
                 FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             foreach (var token in allTokens)
@@ -600,6 +598,42 @@ namespace Com.Rendering
                 }
             }
         }
+        static void ClearGlobal(out InstancedMeshRenderDispatcher[] allDispatchers)
+        {
+            allDispatchers = FindObjectsByType<InstancedMeshRenderDispatcher>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            // clear
+            for (int i = allDispatchers.Length - 1; i >= 0; i--)
+            {
+                var levels = allDispatchers[i].levels;
+                for (int j = levels.Length - 1; j >= 0; j--)
+                {
+                    levels[j]?.Dispose();
+                    levels[j] = null;
+                }
+            }
+            sharedInstances.Clear();
+            savedTokenInfos.Clear();
+        }
+
+#if UNITY_EDITOR
+        static Action<UnityEditor.PlayModeStateChange> s_onPlayModeStateChange = null;
+        static void ListenSharedPlayModeStateChangeCallback()
+        {
+            if (s_onPlayModeStateChange == null)
+            {
+                s_onPlayModeStateChange = state =>
+                {
+                    if (state == UnityEditor.PlayModeStateChange.ExitingEditMode)
+                    {
+                        ClearGlobal(out _);
+                    }
+                };
+
+                UnityEditor.EditorApplication.playModeStateChanged += s_onPlayModeStateChange;
+            }
+        }
+#endif
 
 
         /// <summary>

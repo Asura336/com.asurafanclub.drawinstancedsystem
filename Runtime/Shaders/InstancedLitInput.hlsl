@@ -43,42 +43,42 @@
         #endif
     #endif
 
-    // NOTE: Do not ifdef the properties for dots instancing, but ifdef the actual usage.
-    // Otherwise you might break CPU-side as property constant-buffer offsets change per variant.
-    // NOTE: Dots instancing is orthogonal to the constant buffer above.
-    #ifdef UNITY_DOTS_INSTANCING_ENABLED
-        UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
-        UNITY_DOTS_INSTANCED_PROP(float4, _BaseColor)
-        UNITY_DOTS_INSTANCED_PROP(float4, _SpecColor)
-        UNITY_DOTS_INSTANCED_PROP(float4, _EmissionColor)
-        UNITY_DOTS_INSTANCED_PROP(float , _Cutoff)
-        UNITY_DOTS_INSTANCED_PROP(float , _Smoothness)
-        UNITY_DOTS_INSTANCED_PROP(float , _Metallic)
-        UNITY_DOTS_INSTANCED_PROP(float , _BumpScale)
-        UNITY_DOTS_INSTANCED_PROP(float , _Parallax)
-        UNITY_DOTS_INSTANCED_PROP(float , _OcclusionStrength)
-        UNITY_DOTS_INSTANCED_PROP(float , _ClearCoatMask)
-        UNITY_DOTS_INSTANCED_PROP(float , _ClearCoatSmoothness)
-        UNITY_DOTS_INSTANCED_PROP(float , _DetailAlbedoMapScale)
-        UNITY_DOTS_INSTANCED_PROP(float , _DetailNormalMapScale)
-        UNITY_DOTS_INSTANCED_PROP(float , _Surface)
-        UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
-
-        #define _BaseColor              UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float4 , Metadata_BaseColor)
-        #define _SpecColor              UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float4 , Metadata_SpecColor)
-        #define _EmissionColor          UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float4 , Metadata_EmissionColor)
-        #define _Cutoff                 UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_Cutoff)
-        #define _Smoothness             UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_Smoothness)
-        #define _Metallic               UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_Metallic)
-        #define _BumpScale              UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_BumpScale)
-        #define _Parallax               UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_Parallax)
-        #define _OcclusionStrength      UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_OcclusionStrength)
-        #define _ClearCoatMask          UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_ClearCoatMask)
-        #define _ClearCoatSmoothness    UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_ClearCoatSmoothness)
-        #define _DetailAlbedoMapScale   UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_DetailAlbedoMapScale)
-        #define _DetailNormalMapScale   UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_DetailNormalMapScale)
-        #define _Surface                UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_Surface)
-    #endif
+    //// NOTE: Do not ifdef the properties for dots instancing, but ifdef the actual usage.
+    //// Otherwise you might break CPU-side as property constant-buffer offsets change per variant.
+    //// NOTE: Dots instancing is orthogonal to the constant buffer above.
+    //#ifdef UNITY_DOTS_INSTANCING_ENABLED
+    //    UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
+    //    UNITY_DOTS_INSTANCED_PROP(float4, _BaseColor)
+    //    UNITY_DOTS_INSTANCED_PROP(float4, _SpecColor)
+    //    UNITY_DOTS_INSTANCED_PROP(float4, _EmissionColor)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _Cutoff)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _Smoothness)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _Metallic)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _BumpScale)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _Parallax)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _OcclusionStrength)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _ClearCoatMask)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _ClearCoatSmoothness)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _DetailAlbedoMapScale)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _DetailNormalMapScale)
+    //    UNITY_DOTS_INSTANCED_PROP(float , _Surface)
+    //    UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
+    //
+    //    #define _BaseColor              UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float4 , Metadata_BaseColor)
+    //    #define _SpecColor              UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float4 , Metadata_SpecColor)
+    //    #define _EmissionColor          UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float4 , Metadata_EmissionColor)
+    //    #define _Cutoff                 UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_Cutoff)
+    //    #define _Smoothness             UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_Smoothness)
+    //    #define _Metallic               UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_Metallic)
+    //    #define _BumpScale              UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_BumpScale)
+    //    #define _Parallax               UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_Parallax)
+    //    #define _OcclusionStrength      UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_OcclusionStrength)
+    //    #define _ClearCoatMask          UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_ClearCoatMask)
+    //    #define _ClearCoatSmoothness    UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_ClearCoatSmoothness)
+    //    #define _DetailAlbedoMapScale   UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_DetailAlbedoMapScale)
+    //    #define _DetailNormalMapScale   UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_DetailNormalMapScale)
+    //    #define _Surface                UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_Surface)
+    //#endif
 
     TEXTURE2D(_ParallaxMap);        SAMPLER(sampler_ParallaxMap);
     TEXTURE2D(_OcclusionMap);       SAMPLER(sampler_OcclusionMap);
