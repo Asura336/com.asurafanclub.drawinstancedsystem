@@ -45,6 +45,8 @@ namespace Com.Rendering
         bool m_forceRenderingOff = false;
         int m_bacthIndex = -1;
 
+        bool enableCalled = false;
+
         private void Awake()
         {
             InstancedMeshRenderDispatcher.OnDispatcherEnabled += Dispatcher_OnDispatcherEnabled;
@@ -57,21 +59,30 @@ namespace Com.Rendering
             // 第一次，初始化缓冲区内容
             InitLocalOffsets();
         }
+        private void Start()
+        {
+            if (!enableCalled)
+            {
+                UpdateLocalToWorld();
+                Wakeup();
+            }
+        }
         private void Dispatcher_OnDispatcherEnabled(string dispatcherName)
         {
-            print($"{gameObject.name} listened {dispatcherName} enabled");
+            //print($"{gameObject.name} listened {dispatcherName} enabled");
             Wakeup();
         }
         private void Dispatcher_OnBeforeDispatcherDisable(string dispatcherName)
         {
-            print($"{gameObject.name} listened {dispatcherName} disabled");
-            CheckDispatch();
+            //print($"{gameObject.name} listened {dispatcherName} disabled");
+            InstancedMeshRenderDispatcher.RemoveForce(this);
         }
 
         private void OnEnable()
         {
             UpdateLocalToWorld();
             Wakeup();
+            enableCalled = true;
         }
 
         private void OnDestroy()
@@ -145,7 +156,7 @@ namespace Com.Rendering
 
         private void OnDisable()
         {
-            CheckDispatch();
+            InstancedMeshRenderDispatcher.RemoveForce(this);
         }
 
         /// <summary>

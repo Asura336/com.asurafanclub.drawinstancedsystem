@@ -47,19 +47,33 @@ namespace Com.Rendering.Editor
 
         public override void OnInspectorGUI()
         {
-            //base.OnInspectorGUI();
-
             serializedObject.Update();
 
             // 字段...
             EditorGUILayout.PropertyField(dispatcherName, new GUIContent("调度器的名称"));
-            if (InstancedMeshRenderDispatcher.FindInstanceOrNothing(dispatcherName.stringValue) == null)
+            var dispatcher = InstancedMeshRenderDispatcher.FindInstanceOrNothing(dispatcherName.stringValue);
+            if (dispatcher != null)
+            {
+                GUI.enabled = false;
+                EditorGUILayout.ObjectField(new GUIContent("Mesh"),
+                    dispatcher.InstancedMesh, typeof(Mesh), true);
+                EditorGUILayout.ObjectField(new GUIContent("Material"),
+                    dispatcher.InstancedMaterial, typeof(Material), true);
+                GUI.enabled = true;
+
+                if (GUILayout.Button("选择调度器"))
+                {
+                    Selection.activeObject = dispatcher.gameObject;
+                }
+            }
+            else
             {
                 GUILayout.Label($"<color=yellow>场景中没有调度器 \"{dispatcherName.stringValue}\"</color>",
                     style_richText);
             }
             EditorGUILayout.PropertyField(color, new GUIContent("此批次的颜色"));
-            EditorGUILayout.PropertyField(localBounds, new GUIContent("本地包围盒需要包住此批次的所有实例"));
+            GUILayout.Label("本地包围盒需要包住此批次的所有实例");
+            EditorGUILayout.PropertyField(localBounds);
             EditorGUILayout.PropertyField(batchSize, new GUIContent("预期分配的变换矩阵缓冲区长度"));
 
             if (targets.OfType<InstancedMeshRenderToken>().Any(t => !t.IsSingleInstance))

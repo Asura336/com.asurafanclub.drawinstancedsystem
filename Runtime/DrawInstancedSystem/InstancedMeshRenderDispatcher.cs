@@ -226,16 +226,21 @@ namespace Com.Rendering
         }
 
 
-        [Header("字段在预制体中指定，应视为运行期常量")]
+        //[Header("以下字段在预制体中指定，应视为运行期常量。如果修改需要重启场景的组件")]
         [SerializeField] string dispatcherName;
         [SerializeField] Mesh instanceMesh;
         [SerializeField] Material instanceMaterial;
         [SerializeField] string renderType = null;
         [SerializeField] int defaultRenderSystemCapacity = 64;
+
+        //[Header("以下字段可以修改，但需要应用字段")]
         [Header("每个调度器使用固定的阴影和绘制层选项，如果需要变体，实例化额外的预制体")]
         [SerializeField] ShadowCastingMode shadowCastingMode = ShadowCastingMode.On;
         [SerializeField] bool recieveShadows = true;
         [SerializeField] int layer = 0;
+        [SerializeField] ReflectionProbeUsage reflectionProbeUsage = ReflectionProbeUsage.BlendProbes;
+        [SerializeField] LightProbeProxyVolume lightProbeProxyVolume = null;
+        [SerializeField] LightProbeUsage lightProbeUsage = LightProbeUsage.BlendProbes;
 
 
         private void Awake()
@@ -250,7 +255,7 @@ namespace Com.Rendering
         {
             if (string.IsNullOrEmpty(dispatcherName))
             {
-                Debug.Log("名称为空，跳过");
+                Debug.Log($"{name} 调度器名称为空，跳过");
                 return;
             }
             if (FindInstanceOrNothing(dispatcherName))
@@ -265,15 +270,17 @@ namespace Com.Rendering
 
         private void OnDisable()
         {
-            Active = false;
-            OnBeforeDispatcherDisable?.Invoke(dispatcherName);
-            sharedInstances.Remove(dispatcherName);
-            //print($"{dispatcherName} disabled");
+            if (Active)
+            {
+                Active = false;
+                OnBeforeDispatcherDisable?.Invoke(dispatcherName);
+                sharedInstances.Remove(dispatcherName);
+                //print($"{dispatcherName} disabled");
+            }
         }
 
         private void OnDestroy()
         {
-            sharedInstances.Remove(dispatcherName);
             for (int i = levels.Length - 1; i >= 0; i--)
             {
                 levels[i]?.Dispose();
@@ -331,6 +338,18 @@ namespace Com.Rendering
             }
         }
 
+        [ContextMenu("应用字段")]
+        public void SetCommonFields()
+        {
+            foreach (var pair in levels)
+            {
+                if (pair?.system is InstancedMeshRenderSystem system)
+                {
+                    SetCommonFields(system);
+                }
+            }
+        }
+
         public void InstanceTrimExcess()
         {
             /* 先压缩连接的 token 的缓存
@@ -360,8 +379,31 @@ namespace Com.Rendering
             get => recieveShadows;
             set => recieveShadows = value;
         }
+        public ReflectionProbeUsage ReflectionProbeUsage
+        {
+            get => reflectionProbeUsage;
+            set => reflectionProbeUsage = value;
+        }
+        public LightProbeProxyVolume LightProbeProxyVolume
+        {
+            get => lightProbeProxyVolume;
+            set => lightProbeProxyVolume = value;
+        }
+        public LightProbeUsage LightProbeUsage
+        {
+            get => lightProbeUsage;
+            set => lightProbeUsage = value;
+        }
 
-
+        void SetCommonFields(InstancedMeshRenderSystem system)
+        {
+            system.shadowCastingMode = shadowCastingMode;
+            system.recieveShadows = recieveShadows;
+            system.layer = layer;
+            system.reflectionProbeUsage = reflectionProbeUsage;
+            system.lightProbeProxyVolume = lightProbeProxyVolume;
+            system.lightProbeUsage = lightProbeUsage;
+        }
         SystemWithTokens GetSystemAtLevel(int level)
         {
             if (levels[level] is null)
@@ -370,9 +412,7 @@ namespace Com.Rendering
                 var sys = string.IsNullOrEmpty(renderType)
                     ? new InstancedMeshRenderSystem(instanceMesh, instanceMaterial, batchSize)
                     : new InstancedMeshRenderSystem(instanceMesh, instanceMaterial, renderType, batchSize);
-                sys.shadowCastingMode = shadowCastingMode;
-                sys.recieveShadows = recieveShadows;
-                sys.layer = layer;
+                SetCommonFields(sys);
 
                 var o = new SystemWithTokens(sys);
                 o.system.Setup(defaultRenderSystemCapacity);
@@ -478,6 +518,16 @@ namespace Com.Rendering
                     savedTokenInfos.Remove(token);
                 }
             }
+        }
+        internal static void RemoveForce(InstancedMeshRenderToken token)
+        {
+            bool exist = savedTokenInfos.TryGetValue(token, out var savedInfo);
+            if (exist)
+            {
+                ReleaseToken(savedInfo);
+                savedTokenInfos.Remove(token);
+            }
+            token.BatchIndex = -1;
         }
         static void WriteToRenderSystem(InstancedMeshRenderSystem renderSystem, InstancedMeshRenderToken token, int batchIndex)
         {

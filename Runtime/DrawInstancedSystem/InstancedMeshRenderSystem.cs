@@ -91,6 +91,9 @@ namespace Com.Rendering
         public ShadowCastingMode shadowCastingMode = ShadowCastingMode.On;
         public bool recieveShadows = true;
         public int layer = 0;
+        public ReflectionProbeUsage reflectionProbeUsage = ReflectionProbeUsage.BlendProbes;
+        public LightProbeProxyVolume lightProbeProxyVolume = null;
+        public LightProbeUsage lightProbeUsage = LightProbeUsage.BlendProbes;
 
         private InstancedMeshRenderSystem()
         {
@@ -256,7 +259,6 @@ namespace Com.Rendering
                 instanceColorDirty = false;
             }
 
-            // draw finally
             DrawMesh();
         }
 
@@ -515,19 +517,40 @@ namespace Com.Rendering
         void DrawMesh()
         {
             if (instanceNumber < 1) { return; }
+
+            var renderParams = GetRenderParams(null);
+
             int subMeshCount = instanceMesh.subMeshCount;
             if (subMeshCount == 1)
             {
-                Draw(0);
+                Graphics.RenderMeshPrimitives(renderParams, instanceMesh, 0, instanceNumber);
             }
             else
             {
                 for (int i = 0; i < subMeshCount; i++)
                 {
-                    Draw(i);
+                    Graphics.RenderMeshPrimitives(renderParams, instanceMesh, i, instanceNumber);
                 }
             }
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        RenderParams GetRenderParams(Camera targetCamera) => new RenderParams
+        {
+            material = instandedMaterial,
+            matProps = props,
+            camera = targetCamera,
+            worldBounds = cachedWorldBounds,
+            layer = layer,
+            shadowCastingMode = shadowCastingMode,
+            receiveShadows = recieveShadows,
+            rendererPriority = 0,
+            renderingLayerMask = GraphicsSettings.defaultRenderingLayerMask,
+            reflectionProbeUsage = reflectionProbeUsage,
+            motionVectorMode = MotionVectorGenerationMode.Camera,
+            lightProbeProxyVolume = lightProbeProxyVolume,
+            lightProbeUsage = lightProbeUsage,
+        };
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void Draw(int subMeshIndex)
