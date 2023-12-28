@@ -83,6 +83,7 @@ namespace Com.Rendering
 
         private void OnEnable()
         {
+            Active = true;
             UpdateLocalToWorld();
             Wakeup();
             enableCalled = true;
@@ -159,6 +160,7 @@ namespace Com.Rendering
 
         private void OnDisable()
         {
+            Active = false;
             InstancedMeshRenderDispatcher.RemoveForce(this);
         }
 
@@ -347,6 +349,8 @@ namespace Com.Rendering
         {
             dst = src;
         }
+
+        public bool Active { get; private set; }
 
         /// <summary>
         /// Same as <see cref="Renderer.forceRenderingOff"/>

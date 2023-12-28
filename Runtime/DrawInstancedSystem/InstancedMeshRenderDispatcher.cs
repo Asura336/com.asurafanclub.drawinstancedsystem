@@ -481,7 +481,7 @@ namespace Com.Rendering
         public static void Evaluate(InstancedMeshRenderToken token)
         {
             bool exist = savedTokenInfos.TryGetValue(token, out var savedInfo);
-            bool currentAlive = token && !token.forceRenderingOff && token.enabled && token.gameObject.activeInHierarchy;
+            bool currentAlive = token && !token.forceRenderingOff && token.Active;
             if (currentAlive)
             {
                 var thisTokenInfo = new TokenInfo(token);
