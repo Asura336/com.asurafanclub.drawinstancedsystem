@@ -85,7 +85,7 @@ namespace Com.Rendering
             job = new CalculateBoundsFor
             {
                 matrices = matrices.Reinterpret<float4x4>().AsReadOnly(),
-                meshBounds = *(float3x2*)&meshBounds,
+                meshBounds = math.float3x2(meshBounds.center, meshBounds.size),
                 outputMinMax = minMaxBuffer,
             }.Schedule(length, job);
             job = new DrawInstancedSystemTools.BoundsMinMaxJobFor
