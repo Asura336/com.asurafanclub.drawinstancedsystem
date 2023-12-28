@@ -104,6 +104,8 @@ namespace Com.Rendering
         public LightProbeProxyVolume lightProbeProxyVolume = null;
         public LightProbeUsage lightProbeUsage = LightProbeUsage.BlendProbes;
 
+        public int defaultBatchNumber = 32;
+
         private InstancedMeshRenderSystem()
         {
             props = new MaterialPropertyBlock();
@@ -213,7 +215,7 @@ namespace Com.Rendering
                 // 移动了物体，或者有物体改变包围盒尺寸
                 if (batchLocalToWorldDirty || batchLocalBoundsDirty)
                 {
-                    var outputMinMax = new NativeArray<float3x2>(batchNumber,
+                    using var outputMinMax = new NativeArray<float3x2>(batchNumber,
                         Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                     var job = new TransposeBoundsFor
                     {
@@ -223,7 +225,7 @@ namespace Com.Rendering
                     }.Schedule(batchNumber, 64, default);
 
                     var vMinMax = new NativeArray<float3>(2,
-                        Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                      Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                     vMinMax[0] = float3(float.MaxValue);
                     vMinMax[1] = float3(float.MinValue);
                     new BoundsMinMaxJobFor
@@ -233,22 +235,8 @@ namespace Com.Rendering
                     }.Schedule(batchNumber, job).Complete();
 
                     var pMinMax = (float3*)vMinMax.GetUnsafeReadOnlyPtr();
-                    var vmin = pMinMax[0];
-                    var vmax = pMinMax[1];
-
-                    outputMinMax.Dispose();
+                    MinMax2Bounds(pMinMax[0], pMinMax[1], ref cachedWorldBounds);
                     vMinMax.Dispose();
-
-                    fixed (Bounds* pWorldBounds = &cachedWorldBounds)
-                    {
-                        var pCenter = (Vector3*)pWorldBounds;
-                        var pExtents = pCenter + 1;
-                        // center = lerp(min, max, 0.5)
-                        // extents = max - min
-                        Average3((float*)&vmin, (float*)&vmax, (float*)pCenter);
-                        Minus3((float*)&vmax, (float*)&vmin, (float*)pExtents);
-                        Mul3((float*)pExtents, 0.5f, (float*)pExtents);
-                    }
                 }
 
                 // reset dirty
@@ -377,12 +365,17 @@ namespace Com.Rendering
             // 初始化需要更新序列
             instanceVisibleDirty = true;
         }
+        /// <summary>
+        /// 使用 <see cref="defaultBatchNumber"/> 重设缓冲区长度。
+        /// 见 <see cref="Setup(int)"/>
+        /// </summary>
+        public void Setup() => Setup(defaultBatchNumber);
 
         public void TrimExcess()
         {
-            if (batchNumber == 0 && batchCapacity > 1024)
+            if (batchNumber == 0 && batchCapacity > defaultBatchNumber)
             {
-                Setup(1024);
+                Setup(defaultBatchNumber);
                 batchNumber = 0;
                 instanceNumber = 0;
             }

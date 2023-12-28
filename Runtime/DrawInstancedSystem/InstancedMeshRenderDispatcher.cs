@@ -426,12 +426,13 @@ namespace Com.Rendering
                 var sys = string.IsNullOrEmpty(renderType)
                     ? new InstancedMeshRenderSystem(instanceMesh, instanceMaterial, batchSize)
                     : new InstancedMeshRenderSystem(instanceMesh, instanceMaterial, renderType, batchSize);
+                sys.defaultBatchNumber = batchSize > largeCapacityBatchSizeLimit
+                    ? defaultRenderSystemLargeCapacity
+                    : defaultRenderSystemCapacity;
                 SetCommonFields(sys);
 
                 var o = new SystemWithTokens(sys);
-                o.system.Setup(batchSize > largeCapacityBatchSizeLimit
-                    ? defaultRenderSystemLargeCapacity
-                    : defaultRenderSystemCapacity);
+                o.system.Setup();
                 o.system.BatchNumber = 0;
                 levels[level] = o;
             }

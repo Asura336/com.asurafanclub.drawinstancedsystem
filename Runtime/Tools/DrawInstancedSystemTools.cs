@@ -370,5 +370,14 @@ namespace Com.Rendering
             var center = min + extents;
             bounds.extents = extents; bounds.center = center;
         }
+
+        [BurstCompile(CompileSynchronously = true,
+            FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
+        public unsafe static void MinMax2Bounds(in float3 min, in float3 max, ref Bounds bounds)
+        {
+            var extents = (max - min) * 0.5f;
+            var center = min + extents;
+            bounds.extents = extents; bounds.center = center;
+        }
     }
 }

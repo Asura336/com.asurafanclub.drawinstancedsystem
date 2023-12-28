@@ -4,8 +4,9 @@ MonoImporter:
   externalObjects: {}
   serializedVersion: 2
   defaultReferences:
-  - instanceMesh: {instanceID: 0}
-  - instanceMaterial: {fileID: 2100000, guid: f4dc6892190ed274c948aaf0d20bd0e5, type: 2}
+  - instanceMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  - instanceMaterial: {fileID: 2100000, guid: 70b46631d5207574996dd19c4fcb2f1b, type: 2}
+  - lightProbeProxyVolume: {instanceID: 0}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 
