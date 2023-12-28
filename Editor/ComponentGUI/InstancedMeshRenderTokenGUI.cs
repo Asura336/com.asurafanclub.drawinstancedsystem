@@ -8,6 +8,21 @@ namespace Com.Rendering.Editor
     [CanEditMultipleObjects]
     internal class InstancedMeshRenderTokenGUI : UnityEditor.Editor
     {
+        class LocalStyle
+        {
+            public static readonly GUIContent dispatcherName =
+                 new GUIContent("调度器的名称");
+            public static readonly GUIContent color =
+                 new GUIContent("此批次的颜色");
+            //public static readonly GUIContent localBounds;
+            public static readonly GUIContent transformStatic =
+                 new GUIContent("停止自动更新位置");
+            public static readonly GUIContent batchSize =
+                 new GUIContent("预期分配的变换矩阵缓冲区长度");
+            //public static readonly GUIContent count;
+            //public static readonly GUIContent virtualBatchIndex;
+        }
+
 #pragma warning disable IDE1006 // 命名样式
         static readonly GUILayoutOption notExpandWidth = GUILayout.ExpandWidth(false);
         static readonly GUILayoutOption expandWidth = GUILayout.ExpandWidth(true);
@@ -50,7 +65,7 @@ namespace Com.Rendering.Editor
             serializedObject.Update();
 
             // 字段...
-            EditorGUILayout.PropertyField(dispatcherName, new GUIContent("调度器的名称"));
+            EditorGUILayout.PropertyField(dispatcherName, LocalStyle.dispatcherName);
             var dispatcher = InstancedMeshRenderDispatcher.FindInstanceOrNothing(dispatcherName.stringValue);
             if (dispatcher != null)
             {
@@ -71,10 +86,10 @@ namespace Com.Rendering.Editor
                 GUILayout.Label($"<color=yellow>场景中没有调度器 \"{dispatcherName.stringValue}\"</color>",
                     style_richText);
             }
-            EditorGUILayout.PropertyField(color, new GUIContent("此批次的颜色"));
+            EditorGUILayout.PropertyField(color, LocalStyle.color);
             GUILayout.Label("本地包围盒需要包住此批次的所有实例");
             EditorGUILayout.PropertyField(localBounds);
-            EditorGUILayout.PropertyField(batchSize, new GUIContent("预期分配的变换矩阵缓冲区长度"));
+            EditorGUILayout.PropertyField(batchSize, LocalStyle.batchSize);
 
             if (targets.OfType<InstancedMeshRenderToken>().Any(t => !t.IsSingleInstance))
             {
@@ -96,7 +111,7 @@ namespace Com.Rendering.Editor
                 }
             }
 
-            EditorGUILayout.PropertyField(transformStatic, new GUIContent("停止自动更新位置"));
+            EditorGUILayout.PropertyField(transformStatic, LocalStyle.transformStatic);
             if (transformStatic.hasMultipleDifferentValues
                || transformStatic.boolValue)
             {

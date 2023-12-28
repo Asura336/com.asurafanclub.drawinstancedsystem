@@ -197,7 +197,7 @@ namespace Com.Rendering
         static readonly int[] batchSizeLevels = new int[]
         {
             1, 2, 4, 8, 16, 32, 64, 128,
-            256, 512, 1024, 2048, 4096,
+            256, 512, 1024, 2048, 4096, 8192, 16384, 32768
         };
         static int BatchSizeToLevel(InstancedMeshRenderToken token) => token.BatchSize switch
         {
@@ -214,6 +214,9 @@ namespace Com.Rendering
             1024 => 10,
             2048 => 11,
             4096 => 12,
+            8192 => 13,
+            16384 => 14,
+            32768 => 15,
             _ => DefaultSystemIndex(token)
         };
         static int DefaultSystemIndex(InstancedMeshRenderToken token)
@@ -231,7 +234,9 @@ namespace Com.Rendering
         [SerializeField] Mesh instanceMesh;
         [SerializeField] Material instanceMaterial;
         [SerializeField] string renderType = null;
-        [SerializeField] int defaultRenderSystemCapacity = 64;
+        [SerializeField] int defaultRenderSystemCapacity = 32;
+        [SerializeField] int defaultRenderSystemLargeCapacity = 1;
+        [SerializeField] int largeCapacityBatchSizeLimit = 2047;
 
         //[Header("以下字段可以修改，但需要应用字段")]
         [Header("每个调度器使用固定的阴影和绘制层选项，如果需要变体，实例化额外的预制体")]
@@ -424,7 +429,9 @@ namespace Com.Rendering
                 SetCommonFields(sys);
 
                 var o = new SystemWithTokens(sys);
-                o.system.Setup(defaultRenderSystemCapacity);
+                o.system.Setup(batchSize > largeCapacityBatchSizeLimit
+                    ? defaultRenderSystemLargeCapacity
+                    : defaultRenderSystemCapacity);
                 o.system.BatchNumber = 0;
                 levels[level] = o;
             }

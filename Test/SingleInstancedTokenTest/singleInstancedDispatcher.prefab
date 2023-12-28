@@ -24,12 +24,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6679559815497670771}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &6679559815497670768
 MonoBehaviour:
@@ -47,7 +48,12 @@ MonoBehaviour:
   instanceMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   instanceMaterial: {fileID: 2100000, guid: 0461f572d7852a8499e116e5135eb775, type: 2}
   renderType: Opaque
-  defaultRenderSystemCapacity: 1024
+  defaultRenderSystemCapacity: 64
+  defaultRenderSystemLargeCapacity: 1
+  largeCapacityBatchSizeLimit: 2048
   shadowCastingMode: 1
   recieveShadows: 1
   layer: 0
+  reflectionProbeUsage: 1
+  lightProbeProxyVolume: {fileID: 0}
+  lightProbeUsage: 1

@@ -9,12 +9,37 @@ namespace Com.Rendering.Editor
     [CanEditMultipleObjects]
     public class InstancedMeshRenderDispatcherGUI : UnityEditor.Editor
     {
+        static class LocalStyle
+        {
+            public static readonly GUIContent dispatcherName =
+                new GUIContent("调度器的名称");
+            //public static readonly GUIContent instanceMesh;
+            //public static readonly GUIContent instanceMaterial;
+            public static readonly GUIContent renderType =
+                new GUIContent("RenderType", "着色器 RenderType 对应的内容，留空用着色器已有的");
+            public static readonly GUIContent defaultRenderSystemCapacity =
+                new GUIContent("缺省批次数", "缺省分配的缓冲区分段数目");
+            public static readonly GUIContent defaultRenderSystemLargeCapacity =
+                new GUIContent("大缓冲区批次数", "为大缓冲区准备的缺省分段数目");
+            public static readonly GUIContent largeCapacityBatchSizeLimit =
+                 new GUIContent("大缓冲区实例数", "每批次数目大于此值时将使用另外的缺省分段数目");
+
+            //public static readonly GUIContent shadowCastingMode;
+            //public static readonly GUIContent recieveShadows;
+            //public static readonly GUIContent layer;
+            //public static readonly GUIContent reflectionProbeUsage;
+            //public static readonly GUIContent lightProbeProxyVolume;
+            //public static readonly GUIContent lightProbeUsage;
+        }
+
         bool foldout_primFields = true;
         SerializedProperty dispatcherName;
         SerializedProperty instanceMesh;
         SerializedProperty instanceMaterial;
         SerializedProperty renderType;
         SerializedProperty defaultRenderSystemCapacity;
+        SerializedProperty defaultRenderSystemLargeCapacity;
+        SerializedProperty largeCapacityBatchSizeLimit;
 
         bool foldout_editableRenderFields = true;
         SerializedProperty shadowCastingMode;
@@ -31,6 +56,8 @@ namespace Com.Rendering.Editor
             instanceMaterial = serializedObject.FindProperty("instanceMaterial");
             renderType = serializedObject.FindProperty("renderType");
             defaultRenderSystemCapacity = serializedObject.FindProperty("defaultRenderSystemCapacity");
+            defaultRenderSystemLargeCapacity = serializedObject.FindProperty("defaultRenderSystemLargeCapacity");
+            largeCapacityBatchSizeLimit = serializedObject.FindProperty("largeCapacityBatchSizeLimit");
 
             shadowCastingMode = serializedObject.FindProperty("shadowCastingMode");
             recieveShadows = serializedObject.FindProperty("recieveShadows");
@@ -59,11 +86,15 @@ namespace Com.Rendering.Editor
             if (foldout_primFields)
             {
                 LabelField("需要重启场景的组件或者重新载入场景才能看到改动");
-                PropertyField(dispatcherName, new GUIContent("调度器的名称"));
+                PropertyField(dispatcherName, LocalStyle.dispatcherName);
                 PropertyField(instanceMesh);
                 PropertyField(instanceMaterial);
-                PropertyField(renderType, new GUIContent("着色器 RenderType 对应的内容，留空用着色器已有的"));
-                PropertyField(defaultRenderSystemCapacity, new GUIContent("缺省分配的缓冲区分段数目"));
+                PropertyField(renderType, LocalStyle.renderType);
+                PropertyField(defaultRenderSystemCapacity, LocalStyle.defaultRenderSystemCapacity);
+                GUILayout.Label("缓冲区长度总是 2 次幂，支持的缓冲区上限是 32768");
+                GUILayout.Label("大缓冲区内存需求更大，建议专门配置");
+                PropertyField(largeCapacityBatchSizeLimit, LocalStyle.largeCapacityBatchSizeLimit);
+                PropertyField(defaultRenderSystemLargeCapacity, LocalStyle.defaultRenderSystemLargeCapacity);
             }
             EndFoldoutHeaderGroup();
 
@@ -79,7 +110,7 @@ namespace Com.Rendering.Editor
                 PropertyField(reflectionProbeUsage);
                 PropertyField(lightProbeProxyVolume);
                 PropertyField(lightProbeUsage);
-                if (GUILayout.Button("立即应用这部分字段"))
+                if (GUILayout.Button("立即应用渲染相关的选项"))
                 {
                     foreach (var t in targets.OfType<InstancedMeshRenderDispatcher>())
                     {
