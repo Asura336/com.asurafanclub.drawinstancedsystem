@@ -9,7 +9,7 @@ namespace Com.Rendering
     public sealed class GridInstances : BaseGridInstances
     {
         // 16 * 16 * 16 = 4096
-        public const int maxNumber = 16;
+        public const int maxNumber = 32;
 
         [SerializeField][Range(1, maxNumber)] int xNumber = 1;
         [SerializeField][Range(1, maxNumber)] int yNumber = 1;

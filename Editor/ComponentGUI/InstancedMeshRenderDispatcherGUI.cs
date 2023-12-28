@@ -122,25 +122,31 @@ namespace Com.Rendering.Editor
             Space(10);
             if (GUILayout.Button("目前的缓冲区内存消耗"))
             {
-                const double _mb = 1024 * 1024;
-                const double _kb = 1024;
-
-                long usedMemory = InstancedMeshRenderDispatcher.GetNativeUsedMemory();
-                if (usedMemory > _mb)
-                {
-                    Debug.Log($"绘制实例系统非托管内存：{usedMemory / _mb:0.###} MB ({usedMemory} bytes)");
-                }
-                else if (usedMemory > _kb)
-                {
-                    Debug.Log($"绘制实例系统非托管内存：{usedMemory / _kb:0.###} KB ({usedMemory} bytes)");
-                }
-                else
-                {
-                    Debug.Log($"绘制实例系统非托管内存：{usedMemory} bytes");
-                }
+                PrintUsedNativeMemory();
             }
 
             serializedObject.ApplyModifiedProperties();
+        }
+
+        [MenuItem("绘制实例系统/显示目前的缓冲区内存消耗")]
+        static void PrintUsedNativeMemory()
+        {
+            const double _mb = 1024 * 1024;
+            const double _kb = 1024;
+
+            long usedMemory = InstancedMeshRenderDispatcher.GetNativeUsedMemory();
+            if (usedMemory > _mb)
+            {
+                Debug.Log($"绘制实例系统非托管内存：{usedMemory / _mb:0.###} MB ({usedMemory} bytes)");
+            }
+            else if (usedMemory > _kb)
+            {
+                Debug.Log($"绘制实例系统非托管内存：{usedMemory / _kb:0.###} KB ({usedMemory} bytes)");
+            }
+            else
+            {
+                Debug.Log($"绘制实例系统非托管内存：{usedMemory} bytes");
+            }
         }
     }
 }

@@ -17,8 +17,8 @@ namespace Com.Rendering
             XZ,
         }
 
-        // 64 * 64 = 4096
-        public const int maxNumber = 64;
+        // 180 * 180 = 32400
+        public const int maxNumber = 180;
 
         [SerializeField] AxisUseage axisUseage;
         [SerializeField][Range(1, maxNumber)] int xNumber = 1;

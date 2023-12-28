@@ -17,7 +17,7 @@ namespace Com.Rendering
             Z,
         }
 
-        public const int maxNumber = 4096;
+        public const int maxNumber = 16384;
 
         [SerializeField] AxisUseage axisUseage;
         [SerializeField][Range(1, maxNumber)] int xNumber = 1;
