@@ -243,7 +243,6 @@ namespace Com.Rendering
             [ReadOnly] public NativeArray<float4x4>.ReadOnly instLocalOffset;
             [WriteOnly] public NativeList<float4x4>.ParallelWriter instLocalToWorld;
             [WriteOnly] public NativeList<float4x4>.ParallelWriter instWorldToLocal;
-            [WriteOnly] public NativeList<bool>.ParallelWriter instVisible;
 
             public unsafe void Execute(int index)
             {
@@ -257,13 +256,11 @@ namespace Com.Rendering
                         (*instLocalToWorld.ListData)[index] = localToWorld;
                         (*instWorldToLocal.ListData)[index] = inverse(localToWorld);
                     }
-                        (*instVisible.ListData)[index] = true;
                 }
                 else
                 {
                     (*instLocalToWorld.ListData)[index] = 0;
                     (*instWorldToLocal.ListData)[index] = 0;
-                    (*instVisible.ListData)[index] = false;
                 }
             }
         }

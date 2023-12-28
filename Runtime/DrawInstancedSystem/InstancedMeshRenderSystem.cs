@@ -61,11 +61,6 @@ namespace Com.Rendering
         NativeList<float4x4> instanceLocalOffsetBuffer;
 
         /// <summary>
-        /// [job system output] 标记计划渲染的 instance
-        /// </summary>
-        NativeList<bool> instanceVisibleBuffer;
-
-        /// <summary>
         /// [job system output] 所有 instance 的本地空间到世界空间变换。
         ///缓存这个变换，移除物体时可以不重计算变换。
         /// </summary>
@@ -163,7 +158,7 @@ namespace Com.Rendering
             Release(batchCountBuffer);
 
             Release(instanceLocalOffsetBuffer);
-            Release(instanceVisibleBuffer);
+            //Release(instanceVisibleBuffer);
             Release(instanceLocalToWorldBuffer);
             Release(instanceWorldToLocalBuffer);
             Release(batchLocalBoundsBuffer);
@@ -210,7 +205,7 @@ namespace Com.Rendering
                         instLocalOffset = instanceLocalOffsetBuffer.AsParallelReader(),
                         instLocalToWorld = instanceLocalToWorldBuffer.AsParallelWriter(),
                         instWorldToLocal = instanceWorldToLocalBuffer.AsParallelWriter(),
-                        instVisible = instanceVisibleBuffer.AsParallelWriter(),
+                        //instVisible = instanceVisibleBuffer.AsParallelWriter(),
                     }.Schedule(instanceNumber, 64, default).Complete();
 
                     instanceVisibleDirty = true;
@@ -267,7 +262,8 @@ namespace Com.Rendering
 
             if (instanceVisibleDirty)
             {
-                MakeIndirectIndexMap(instanceNumber, instanceVisibleBuffer.GetUnsafePtr(),
+                MakeIndirectIndexMap(instanceNumber, batchSize,
+                    batchCountBuffer.GetUnsafePtr(),
                     ref visibleNumber, instanceIndirectIndexMap.GetUnsafePtr());
 
                 using var instanceLocalToWorldIndirectBuffer = new NativeArray<float4x4>(instanceNumber,
@@ -315,13 +311,16 @@ namespace Com.Rendering
             DrawMesh();
         }
         [BurstCompile]
-        static unsafe void MakeIndirectIndexMap(int length, [NoAlias] bool* visible,
-             ref int counter, [NoAlias] int* indirectIndexMap)
+        static unsafe void MakeIndirectIndexMap(int length,
+            int batchSize, [NoAlias] int* batchCount,
+            ref int counter, [NoAlias] int* indirectIndexMap)
         {
             counter = 0;
             for (int i = 0; i < length; i++)
             {
-                if (visible[i])
+                int batchIndex = i / batchSize;
+                bool inRange = (i % batchSize) < batchCount[batchIndex];
+                if (inRange)
                 {
                     indirectIndexMap[counter] = i;
                     counter++;
@@ -343,7 +342,7 @@ namespace Com.Rendering
             {
                 // grows up
                 Realloc(ref instanceLocalOffsetBuffer, instanceCapacity);
-                Realloc(ref instanceVisibleBuffer, instanceCapacity);
+                //Realloc(ref instanceVisibleBuffer, instanceCapacity);
                 Realloc(ref instanceLocalToWorldBuffer, instanceCapacity);
                 Realloc(ref instanceWorldToLocalBuffer, instanceCapacity);
                 Realloc(ref instanceColorBuffer, instanceCapacity);
@@ -547,10 +546,6 @@ namespace Com.Rendering
                 + UsedMemory(instanceColorBuffer)
 
                 + UsedMemory(instanceIndirectIndexMap)
-
-                //+ UsedMemory(instanceLocalToWorldIndirectBuffer)
-                //+ UsedMemory(instanceWorldToLocalIndirectBuffer)
-                //+ UsedMemory(instanceColorIndirectBuffer)
 
                 + UsedMemory(loadlToWorldBuffer)
                 + UsedMemory(worldToLocalBuffer)

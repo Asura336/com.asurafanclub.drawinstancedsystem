@@ -94,7 +94,7 @@ namespace Com.Rendering.Editor
             if (targets.OfType<InstancedMeshRenderToken>().Any(t => !t.IsSingleInstance))
             {
                 GUILayout.Space(10);
-                if (GUILayout.Button("设置为单实例"))
+                if (!Application.isPlaying && GUILayout.Button("设置为单实例（方便制作预制体）"))
                 {
                     foreach (var t in targets.OfType<InstancedMeshRenderToken>())
                     {
