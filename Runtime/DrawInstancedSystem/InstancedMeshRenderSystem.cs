@@ -205,7 +205,6 @@ namespace Com.Rendering
                         instLocalOffset = instanceLocalOffsetBuffer.AsParallelReader(),
                         instLocalToWorld = instanceLocalToWorldBuffer.AsParallelWriter(),
                         instWorldToLocal = instanceWorldToLocalBuffer.AsParallelWriter(),
-                        //instVisible = instanceVisibleBuffer.AsParallelWriter(),
                     }.Schedule(instanceNumber, 64, default).Complete();
 
                     instanceVisibleDirty = true;
