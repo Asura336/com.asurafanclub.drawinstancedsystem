@@ -13,6 +13,8 @@ using static Unity.Mathematics.math;
 
 namespace Com.Rendering
 {
+    [BurstCompile(CompileSynchronously = true,
+        FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
     public sealed class InstancedMeshRenderSystem : IDisposable
     {
         /// <summary>
@@ -66,8 +68,6 @@ namespace Com.Rendering
         /// <summary>
         /// [job system output] 所有 instance 的本地空间到世界空间变换。
         ///缓存这个变换，移除物体时可以不重计算变换。
-        ///因为内存排列上按定长度分片，不是所有的成员都代表有效值，用零值的变换表示无效值，
-        ///在着色器里判断矩阵的最后一列（行）是 (0,0,0,0) 还是 (0,0,0,1) 略麻烦，不用传递 3x4 矩阵的优化做法。
         /// </summary>
         NativeList<float4x4> instanceLocalToWorldBuffer;
         /// <summary>
@@ -82,17 +82,9 @@ namespace Com.Rendering
         NativeList<float4> instanceColorBuffer;
 
         /// <summary>
-        /// [job system output] 所有有效的 instane 本地空间到世界空间变换
+        /// [job system output] 所有 instance 从分片内存传递到连续内存的映射
         /// </summary>
-        NativeList<float4x4> instanceLocalToWorldIndirectBuffer;
-        /// <summary>
-        /// [job system output] 所有有效的 instane 世界空间到本地空间变换
-        /// </summary>
-        NativeList<float4x4> instanceWorldToLocalIndirectBuffer;
-        /// <summary>
-        /// [job system output] 所有有效的 instane 颜色
-        /// </summary>
-        NativeList<float4> instanceColorIndirectBuffer;
+        NativeList<int> instanceIndirectIndexMap;
 
         bool _disposed;
 
@@ -166,27 +158,20 @@ namespace Com.Rendering
             colorsBuffer?.Dispose();
             colorsBuffer = null;
 
-            release(batchLocalToWorldBuffer);
-            release(batchLocalToWorldDirtyMask);
-            release(batchCountBuffer);
+            Release(batchLocalToWorldBuffer);
+            Release(batchLocalToWorldDirtyMask);
+            Release(batchCountBuffer);
 
-            release(instanceLocalOffsetBuffer);
-            release(instanceVisibleBuffer);
-            release(instanceLocalToWorldBuffer);
-            release(instanceWorldToLocalBuffer);
-            release(batchLocalBoundsBuffer);
-            release(instanceColorBuffer);
+            Release(instanceLocalOffsetBuffer);
+            Release(instanceVisibleBuffer);
+            Release(instanceLocalToWorldBuffer);
+            Release(instanceWorldToLocalBuffer);
+            Release(batchLocalBoundsBuffer);
+            Release(instanceColorBuffer);
 
-            release(instanceLocalToWorldIndirectBuffer);
-            release(instanceWorldToLocalIndirectBuffer);
-            release(instanceColorIndirectBuffer);
+            Release(instanceIndirectIndexMap);
 
             _disposed = true;
-
-            static void release<T>(NativeList<T> list) where T : unmanaged
-            {
-                if (list.IsCreated) { list.Dispose(); }
-            }
         }
 
         public unsafe void Update()
@@ -282,65 +267,63 @@ namespace Com.Rendering
 
             if (instanceVisibleDirty)
             {
-                CopyIndirectMatrixBuffer(instanceNumber, instanceVisibleBuffer.GetUnsafePtr(),
-                    instanceLocalToWorldBuffer.GetUnsafePtr(),
-                    instanceWorldToLocalBuffer.GetUnsafePtr(),
-                    ref visibleNumber,
-                    instanceLocalToWorldIndirectBuffer.GetUnsafePtr(),
-                    instanceWorldToLocalIndirectBuffer.GetUnsafePtr());
+                MakeIndirectIndexMap(instanceNumber, instanceVisibleBuffer.GetUnsafePtr(),
+                    ref visibleNumber, instanceIndirectIndexMap.GetUnsafePtr());
 
-                SetData(loadlToWorldBuffer, instanceLocalToWorldIndirectBuffer.AsArray(), visibleNumber);
-                SetData(worldToLocalBuffer, instanceWorldToLocalIndirectBuffer.AsArray(), visibleNumber);
+                using var instanceLocalToWorldIndirectBuffer = new NativeArray<float4x4>(instanceNumber,
+                    Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                using var instanceWorldToLocalIndirectBuffer = new NativeArray<float4x4>(instanceNumber,
+                    Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+
+                var _job = default(JobHandle);
+                _job = new CopyMatrixBufferFor
+                {
+                    indirectIndexMap = instanceIndirectIndexMap.AsParallelReader(),
+                    src = instanceLocalToWorldBuffer.AsReadOnly(),
+                    dst = instanceLocalToWorldIndirectBuffer,
+                }.Schedule(visibleNumber, 128, _job);
+                _job = new CopyMatrixBufferFor
+                {
+                    indirectIndexMap = instanceIndirectIndexMap.AsParallelReader(),
+                    src = instanceWorldToLocalBuffer.AsReadOnly(),
+                    dst = instanceWorldToLocalIndirectBuffer,
+                }.Schedule(visibleNumber, 128, _job);
+                _job.Complete();
+
+                SetData(loadlToWorldBuffer, instanceLocalToWorldIndirectBuffer, visibleNumber);
+                SetData(worldToLocalBuffer, instanceWorldToLocalIndirectBuffer, visibleNumber);
 
                 instanceVisibleDirty = false;
-
-                // 序列变化过
+                // 序列变化过，重新写入材质字段
                 instanceColorDirty = true;
             }
 
             if (instanceColorDirty)
             {
-                CopyIndirectColorBuffer(instanceNumber, instanceVisibleBuffer.GetUnsafePtr(),
-                     instanceColorBuffer.GetUnsafePtr(), instanceColorIndirectBuffer.GetUnsafePtr());
-                SetData(colorsBuffer, instanceColorIndirectBuffer.AsArray(), visibleNumber);
+                using var instanceIndirectColorBuffer = new NativeArray<float4>(instanceNumber,
+                    Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                new CopyVectorFieldsFor
+                {
+                    indirectIndexMap = instanceIndirectIndexMap.AsParallelReader(),
+                    src = instanceColorBuffer.AsReadOnly(),
+                    dst = instanceIndirectColorBuffer,
+                }.Schedule(visibleNumber, 128).Complete();
+                SetData(colorsBuffer, instanceIndirectColorBuffer, visibleNumber);
                 instanceColorDirty = false;
             }
 
             DrawMesh();
         }
         [BurstCompile]
-        static unsafe void CopyIndirectMatrixBuffer(int length,
-            [NoAlias] bool* visible,
-            [NoAlias] float4x4* localToWorld,
-            [NoAlias] float4x4* worldToLocal,
-
-            ref int counter,
-            [NoAlias] float4x4* localToWorldIndirect,
-            [NoAlias] float4x4* worldToLocalIndirect)
+        static unsafe void MakeIndirectIndexMap(int length, [NoAlias] bool* visible,
+             ref int counter, [NoAlias] int* indirectIndexMap)
         {
             counter = 0;
             for (int i = 0; i < length; i++)
             {
                 if (visible[i])
                 {
-                    localToWorldIndirect[counter] = localToWorld[i];
-                    worldToLocalIndirect[counter] = worldToLocal[i];
-                    counter++;
-                }
-            }
-        }
-        [BurstCompile]
-        static unsafe void CopyIndirectColorBuffer(int length,
-           [NoAlias] bool* visible,
-           [NoAlias] float4* color,
-           [NoAlias] float4* colorIndirect)
-        {
-            int counter = 0;
-            for (int i = 0; i < length; i++)
-            {
-                if (visible[i])
-                {
-                    colorIndirect[counter] = color[i];
+                    indirectIndexMap[counter] = i;
                     counter++;
                 }
             }
@@ -365,9 +348,7 @@ namespace Com.Rendering
                 Realloc(ref instanceWorldToLocalBuffer, instanceCapacity);
                 Realloc(ref instanceColorBuffer, instanceCapacity);
 
-                Realloc(ref instanceLocalToWorldIndirectBuffer, instanceCapacity);
-                Realloc(ref instanceWorldToLocalIndirectBuffer, instanceCapacity);
-                Realloc(ref instanceColorIndirectBuffer, instanceCapacity);
+                Realloc(ref instanceIndirectIndexMap, instanceCapacity);
 
                 Realloc(ref batchLocalToWorldBuffer, capacity);
                 Realloc(ref batchLocalToWorldDirtyMask, capacity);
@@ -394,6 +375,9 @@ namespace Com.Rendering
             batchCapacity = capacity;
             batchNumber = capacity;
             instanceNumber = instanceCapacity;
+
+            // 初始化需要更新序列
+            instanceVisibleDirty = true;
         }
 
         public void TrimExcess()
@@ -403,27 +387,6 @@ namespace Com.Rendering
                 Setup(1024);
                 batchNumber = 0;
                 instanceNumber = 0;
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static unsafe void Realloc<T>(ref NativeList<T> nativeList, int capacity) where T : unmanaged
-        {
-            if (nativeList.IsCreated)
-            {
-                nativeList.ResizeUninitialized(capacity);
-                nativeList.Length = capacity;
-                if (nativeList.Capacity > capacity)
-                {
-                    nativeList.TrimExcess();
-                }
-            }
-            else
-            {
-                nativeList = new NativeList<T>(capacity, AllocatorManager.Persistent)
-                {
-                    Length = capacity
-                };
             }
         }
 
@@ -583,9 +546,11 @@ namespace Com.Rendering
                 + UsedMemory(instanceWorldToLocalBuffer)
                 + UsedMemory(instanceColorBuffer)
 
-                + UsedMemory(instanceLocalToWorldIndirectBuffer)
-                + UsedMemory(instanceWorldToLocalIndirectBuffer)
-                + UsedMemory(instanceColorIndirectBuffer)
+                + UsedMemory(instanceIndirectIndexMap)
+
+                //+ UsedMemory(instanceLocalToWorldIndirectBuffer)
+                //+ UsedMemory(instanceWorldToLocalIndirectBuffer)
+                //+ UsedMemory(instanceColorIndirectBuffer)
 
                 + UsedMemory(loadlToWorldBuffer)
                 + UsedMemory(worldToLocalBuffer)
@@ -659,5 +624,36 @@ namespace Com.Rendering
         //        recieveShadows,
         //        layer);
         //}
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static unsafe void Realloc<T>(ref NativeList<T> nativeList, int capacity) where T : unmanaged
+        {
+            if (nativeList.IsCreated)
+            {
+                nativeList.ResizeUninitialized(capacity);
+                nativeList.Length = capacity;
+                if (nativeList.Capacity > capacity)
+                {
+                    nativeList.TrimExcess();
+                }
+            }
+            else
+            {
+                nativeList = new NativeList<T>(capacity, AllocatorManager.Persistent)
+                {
+                    Length = capacity
+                };
+            }
+        }
+        static void Release<T>(NativeList<T> list) where T : unmanaged
+        {
+            if (list.IsCreated) { list.Dispose(); }
+        }
+
+        static void Release<T>(NativeArray<T> list) where T : unmanaged
+        {
+            if (list.IsCreated) { list.Dispose(); }
+        }
     }
 }

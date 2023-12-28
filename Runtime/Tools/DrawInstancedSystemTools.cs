@@ -226,9 +226,8 @@ namespace Com.Rendering
             return 1 << 30;
         }
 
-        [BurstCompile(FloatPrecision = FloatPrecision.Standard,
-           FloatMode = FloatMode.Fast,
-           CompileSynchronously = true)]
+        [BurstCompile(CompileSynchronously = true,
+           FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
         public struct MulTrsJobFor : IJobParallelFor
         {
             /* 计算每批次内所有绘制实例的变换
@@ -266,6 +265,38 @@ namespace Com.Rendering
                     (*instWorldToLocal.ListData)[index] = 0;
                     (*instVisible.ListData)[index] = false;
                 }
+            }
+        }
+
+        [BurstCompile(CompileSynchronously = true,
+            FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
+        public struct CopyMatrixBufferFor : IJobParallelFor
+        {
+            [ReadOnly] public NativeArray<int>.ReadOnly indirectIndexMap;
+            [NativeDisableParallelForRestriction]
+            [ReadOnly] public NativeArray<float4x4>.ReadOnly src;
+
+            [WriteOnly] public NativeArray<float4x4> dst;
+
+            public void Execute(int index)
+            {
+                dst[index] = src[indirectIndexMap[index]];
+            }
+        }
+
+        [BurstCompile(CompileSynchronously = true,
+            FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
+        public struct CopyVectorFieldsFor : IJobParallelFor
+        {
+            [ReadOnly] public NativeArray<int>.ReadOnly indirectIndexMap;
+            [NativeDisableParallelForRestriction]
+            [ReadOnly] public NativeArray<float4>.ReadOnly src;
+
+            [WriteOnly] public NativeArray<float4> dst;
+
+            public void Execute(int index)
+            {
+                dst[index] = src[indirectIndexMap[index]];
             }
         }
 

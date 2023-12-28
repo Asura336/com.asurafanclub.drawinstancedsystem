@@ -1,4 +1,5 @@
 ﻿using System;
+using Unity.Burst;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using static Com.Rendering.DrawInstancedSystemTools;
@@ -12,6 +13,8 @@ namespace Com.Rendering
     [AddComponentMenu("Com/Rendering/绘制实例符号")]
     [DisallowMultipleComponent]
     [ExecuteInEditMode]
+    [BurstCompile(CompileSynchronously = true,
+        FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
     public sealed class InstancedMeshRenderToken : MonoBehaviour
     {
         const int defaultBufferSize = 64;
@@ -329,9 +332,20 @@ namespace Com.Rendering
             : cachedLocalToWorld = cachedTransform.localToWorldMatrix;
         public void GetLocalToWorld(ref Matrix4x4 localToWorld)
         {
-            localToWorld = transformStatic
-            ? cachedLocalToWorld
-            : cachedLocalToWorld = cachedTransform.localToWorldMatrix;
+            if (!transformStatic)
+            {
+                cachedLocalToWorld = cachedTransform.localToWorldMatrix;
+            }
+            CopyMatrix(cachedLocalToWorld, ref localToWorld);
+
+            //localToWorld = transformStatic
+            //? cachedLocalToWorld
+            //: cachedLocalToWorld = cachedTransform.localToWorldMatrix;
+        }
+        [BurstCompile]
+        static void CopyMatrix(in Matrix4x4 src, ref Matrix4x4 dst)
+        {
+            dst = src;
         }
 
         /// <summary>
