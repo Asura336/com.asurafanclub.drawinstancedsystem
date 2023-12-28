@@ -60,7 +60,7 @@ namespace Com.Rendering
         {
             int length = XNumber * YNumber * ZNumber;
             using var matrices = new NativeArray<float4x4>(length, Allocator.TempJob,
-                NativeArrayOptions.UninitializedMemory);
+                AllocOptions);
             InternalApplyMatrices(length, (float4x4*)matrices.GetUnsafePtr(),
                 basePoint, math.int3(XNumber, YNumber, ZNumber), distances, euler, scale);
             var matricesAsMatrix4x4 = matrices.Reinterpret<Matrix4x4>();
@@ -77,10 +77,11 @@ namespace Com.Rendering
             };
 
             int length = matrices.Length;
+            // 编辑器下分配的缓冲区清空内存，否则可能出现奇怪的结果
             using var minMaxBuffer = new NativeArray<float3x2>(length, Allocator.TempJob,
-                NativeArrayOptions.UninitializedMemory);
+                AllocOptions);
             using var minMax2 = new NativeArray<float3>(2, Allocator.TempJob,
-                NativeArrayOptions.UninitializedMemory);
+                AllocOptions);
             var job = default(JobHandle);
             job = new CalculateBoundsFor
             {
@@ -96,11 +97,9 @@ namespace Com.Rendering
             job.Complete();
 
             var pMinMax = (float3*)minMax2.GetUnsafeReadOnlyPtr();
-            var vmin = pMinMax[0];
-            var vmax = pMinMax[1];
 
             Bounds o = default;
-            DrawInstancedSystemTools.MinMax2Bounds(vmin, vmax, ref o);
+            DrawInstancedSystemTools.MinMax2Bounds(pMinMax[0], pMinMax[1], ref o);
             return o;
         }
 
@@ -132,6 +131,13 @@ namespace Com.Rendering
                 }
             }
         }
+
+        /// <summary>
+        /// 编辑器下分配的缓冲区清空内存，否则可能出现奇怪的结果
+        /// </summary>
+        NativeArrayOptions AllocOptions => Application.isPlaying
+                ? NativeArrayOptions.UninitializedMemory
+                : NativeArrayOptions.ClearMemory;
 
         struct CalculateBoundsFor : IJobFor
         {
