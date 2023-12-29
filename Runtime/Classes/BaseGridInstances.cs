@@ -110,7 +110,7 @@ namespace Com.Rendering
 
 
         [BurstCompile]
-        protected unsafe static void InternalApplyMatrices(int length, float4x4* matrices,
+        protected unsafe static void InternalApplyMatrices(int length, [WriteOnly] float4x4* matrices,
             in float3 center, in int3 numbers, in float3 distances, in float3 euler, in float3 scale)
         {
             var instRotation = quaternion.Euler(math.radians(euler));
@@ -139,6 +139,8 @@ namespace Com.Rendering
                 ? NativeArrayOptions.UninitializedMemory
                 : NativeArrayOptions.ClearMemory;
 
+        [BurstCompile(CompileSynchronously = true,
+        FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
         struct CalculateBoundsFor : IJobFor
         {
             [ReadOnly] public float3x2 meshBounds;
