@@ -334,12 +334,14 @@ namespace Com.Rendering
             : cachedLocalToWorld = cachedTransform.localToWorldMatrix;
         public void GetLocalToWorld(ref Matrix4x4 localToWorld)
         {
+            // 2517 times, 4.48 ms
             if (!transformStatic)
             {
                 cachedLocalToWorld = cachedTransform.localToWorldMatrix;
             }
             CopyMatrix(cachedLocalToWorld, ref localToWorld);
 
+            //// 2517 times, 8.53 ms
             //localToWorld = transformStatic
             //? cachedLocalToWorld
             //: cachedLocalToWorld = cachedTransform.localToWorldMatrix;
