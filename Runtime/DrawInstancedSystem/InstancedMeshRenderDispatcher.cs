@@ -448,7 +448,8 @@ namespace Com.Rendering
         /// <returns></returns>
         public static InstancedMeshRenderDispatcher FindInstanceOrNothing(string name)
         {
-            return sharedInstances.TryGetValue(name, out var v) ? v : null;
+            return !string.IsNullOrEmpty(name) && sharedInstances.TryGetValue(name, out var v)
+                ? v : null;
         }
 
         public static void TrimExcess()
