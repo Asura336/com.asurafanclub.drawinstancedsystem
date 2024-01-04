@@ -286,6 +286,7 @@ namespace Com.Rendering
                 sharedInstances.Remove(dispatcherName);
 
                 // 编辑器模式下重载程序域时卸载 levels
+                // https://forum.unity.com/threads/using-jobs-in-the-editor.546706/#post-3608265
                 if (!Application.isPlaying)
                 {
                     for (int i = levels.Length - 1; i >= 0; i--)
