@@ -284,7 +284,16 @@ namespace Com.Rendering
                 Active = false;
                 OnBeforeDispatcherDisable?.Invoke(dispatcherName);
                 sharedInstances.Remove(dispatcherName);
-                //print($"{dispatcherName} disabled");
+
+                // 编辑器模式下重载程序域时卸载 levels
+                if (!Application.isPlaying)
+                {
+                    for (int i = levels.Length - 1; i >= 0; i--)
+                    {
+                        levels[i]?.Dispose();
+                        levels[i] = null;
+                    }
+                }
             }
         }
 
@@ -561,8 +570,9 @@ namespace Com.Rendering
             var savedDispatcher = savedInfo.savedDispatcher;
             if (savedDispatcher)
             {
+                // 编辑器模式下重载程序域时 level 会被删除
                 var renderSystem = savedDispatcher.levels[savedInfo.systemLevel];
-                renderSystem.EraseTokenAt(savedInfo.batchIndex);
+                renderSystem?.EraseTokenAt(savedInfo.batchIndex);
             }
         }
 
