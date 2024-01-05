@@ -1,6 +1,6 @@
 # Draw Instanced System (URP)
 
-`Graphics.DrawMeshInstancedProcedural` 的包装器，旨在减少提交数据给 GPU 的频率。
+`Graphics.DrawMeshInstancedProcedural` 的包装器，旨在使用实例化绘制时减少提交数据给 GPU 的频率。
 
 此版本适配 URP，内部的绘制方法适应新版本引擎替换为 `Graphics.RenderMeshPrimitives`，绘制效率一致。
 
