@@ -156,18 +156,17 @@ namespace Com.Rendering
             colorsBuffer?.Dispose();
             colorsBuffer = null;
 
-            Release(batchLocalToWorldBuffer);
-            Release(batchLocalToWorldDirtyMask);
-            Release(batchCountBuffer);
+            Release(ref batchLocalToWorldBuffer);
+            Release(ref batchLocalToWorldDirtyMask);
+            Release(ref batchCountBuffer);
 
-            Release(instanceLocalOffsetBuffer);
-            //Release(instanceVisibleBuffer);
-            Release(instanceLocalToWorldBuffer);
-            Release(instanceWorldToLocalBuffer);
-            Release(batchLocalBoundsBuffer);
-            Release(instanceColorBuffer);
+            Release(ref instanceLocalOffsetBuffer);
+            Release(ref instanceLocalToWorldBuffer);
+            Release(ref instanceWorldToLocalBuffer);
+            Release(ref batchLocalBoundsBuffer);
+            Release(ref instanceColorBuffer);
 
-            Release(instanceIndirectIndexMap);
+            Release(ref instanceIndirectIndexMap);
 
             _disposed = true;
         }

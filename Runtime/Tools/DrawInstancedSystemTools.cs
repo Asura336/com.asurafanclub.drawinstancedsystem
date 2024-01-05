@@ -172,21 +172,33 @@ namespace Com.Rendering
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Release<T>(NativeList<T> list) where T : unmanaged
+        public static void Release<T>(ref NativeList<T> list) where T : unmanaged
         {
-            if (list.IsCreated) { list.Dispose(); }
+            if (list.IsCreated)
+            {
+                list.Dispose();
+                list = default;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Release<T>(NativeArray<T> list) where T : unmanaged
+        public static void Release<T>(ref NativeArray<T> array) where T : unmanaged
         {
-            if (list.IsCreated) { list.Dispose(); }
+            if (array.IsCreated)
+            {
+                array.Dispose();
+                array = default;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Release(TransformAccessArray array)
+        public static void Release(ref TransformAccessArray array)
         {
-            if (array.isCreated) { array.Dispose(); }
+            if (array.isCreated)
+            {
+                array.Dispose();
+                array = default;
+            }
         }
 
         [BurstCompile]

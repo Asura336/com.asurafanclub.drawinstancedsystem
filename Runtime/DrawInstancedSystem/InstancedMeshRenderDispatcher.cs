@@ -167,7 +167,7 @@ namespace Com.Rendering
                     savedTokens = null;
                     tokenLocalToWorlds = null;
                 }
-                Release(tokenTransforms);
+                Release(ref tokenTransforms);
                 system.Dispose();
                 DisposeValue = true;
             }
