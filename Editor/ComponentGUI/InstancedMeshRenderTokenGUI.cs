@@ -38,7 +38,6 @@ namespace Com.Rendering.Editor
         SerializedProperty dispatcherName;
         SerializedProperty color;
         SerializedProperty localBounds;
-        SerializedProperty transformStatic;
 
         // before play
         SerializedProperty batchSize;
@@ -52,7 +51,6 @@ namespace Com.Rendering.Editor
             dispatcherName = serializedObject.FindProperty("dispatcherName");
             color = serializedObject.FindProperty("color");
             localBounds = serializedObject.FindProperty("localBounds");
-            transformStatic = serializedObject.FindProperty("transformStatic");
 
             batchSize = serializedObject.FindProperty("batchSize");
 
@@ -108,19 +106,6 @@ namespace Com.Rendering.Editor
                 foreach (var t in targets.OfType<InstancedMeshRenderToken>())
                 {
                     t.CheckDispatch();
-                }
-            }
-
-            EditorGUILayout.PropertyField(transformStatic, LocalStyle.transformStatic);
-            if (transformStatic.hasMultipleDifferentValues
-               || transformStatic.boolValue)
-            {
-                if (GUILayout.Button("立即同步变换"))
-                {
-                    foreach (var t in targets.OfType<InstancedMeshRenderToken>())
-                    {
-                        t.UpdateLocalToWorld();
-                    }
                 }
             }
 

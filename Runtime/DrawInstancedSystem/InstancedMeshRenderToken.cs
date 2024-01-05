@@ -300,20 +300,7 @@ namespace Com.Rendering
             && Capacity > 0 && EqualsMatrix4x4(localOffsets[0], Matrix4x4.identity);
 
         public int Capacity => localOffsets?.Length ?? 0;
-        /// <summary>
-        /// 不自动更新变换矩阵
-        /// </summary>
-        public bool TransformStatic
-        {
-            get => transformStatic; set
-            {
-                transformStatic = value;
-                if (!value)
-                {
-                    cachedLocalToWorld = cachedTransform.localToWorldMatrix;
-                }
-            }
-        }
+
         public void UpdateLocalToWorld()
         {
             if (transformStatic)
