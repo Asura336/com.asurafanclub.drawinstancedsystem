@@ -60,7 +60,7 @@ namespace Com.Rendering
         {
             int length = XNumber * YNumber * ZNumber;
             using var matrices = new NativeArray<float4x4>(length, Allocator.TempJob,
-                AllocOptions);
+                NativeArrayOptions.ClearMemory);
             InternalApplyMatrices(length, (float4x4*)matrices.GetUnsafePtr(),
                 basePoint, math.int3(XNumber, YNumber, ZNumber), distances, euler, scale);
             var matricesAsMatrix4x4 = matrices.Reinterpret<Matrix4x4>();
@@ -135,9 +135,7 @@ namespace Com.Rendering
         /// <summary>
         /// 编辑器下分配的缓冲区清空内存，否则可能出现奇怪的结果
         /// </summary>
-        NativeArrayOptions AllocOptions => Application.isPlaying
-                ? NativeArrayOptions.UninitializedMemory
-                : NativeArrayOptions.ClearMemory;
+        NativeArrayOptions AllocOptions =>  NativeArrayOptions.ClearMemory;
 
         [BurstCompile(CompileSynchronously = true,
         FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]

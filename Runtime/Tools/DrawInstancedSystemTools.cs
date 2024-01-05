@@ -6,6 +6,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Jobs;
 using static Unity.Mathematics.math;
 
 namespace Com.Rendering
@@ -136,6 +137,58 @@ namespace Com.Rendering
             else if (dst.Length != size) { Array.Resize(ref dst, size); }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Realloc(ref TransformAccessArray transformAccessArray, int size)
+        {
+            if (transformAccessArray.isCreated)
+            {
+                transformAccessArray.capacity = size;
+            }
+            else
+            {
+                TransformAccessArray.Allocate(size, -1, out transformAccessArray);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void Realloc<T>(ref NativeList<T> nativeList, int capacity) where T : unmanaged
+        {
+            if (nativeList.IsCreated)
+            {
+                nativeList.ResizeUninitialized(capacity);
+                nativeList.Length = capacity;
+                if (nativeList.Capacity > capacity)
+                {
+                    nativeList.TrimExcess();
+                }
+            }
+            else
+            {
+                nativeList = new NativeList<T>(capacity, AllocatorManager.Persistent)
+                {
+                    Length = capacity
+                };
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Release<T>(NativeList<T> list) where T : unmanaged
+        {
+            if (list.IsCreated) { list.Dispose(); }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Release<T>(NativeArray<T> list) where T : unmanaged
+        {
+            if (list.IsCreated) { list.Dispose(); }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Release(TransformAccessArray array)
+        {
+            if (array.isCreated) { array.Dispose(); }
+        }
+
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void MultiplyPoint3x4(this in Matrix4x4 mul, in Vector3 point, ref Vector3 result)
@@ -261,6 +314,37 @@ namespace Com.Rendering
                 {
                     (*instLocalToWorld.ListData)[index] = 0;
                     (*instWorldToLocal.ListData)[index] = 0;
+                }
+            }
+        }
+
+        [BurstCompile(CompileSynchronously = true,
+            FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
+        public struct SyncBatchLocalToWorldFor : IJobParallelForTransform
+        {
+            public int length;
+            public NativeArray<float4x4> batchLocalToWorldBuffer;
+
+            [WriteOnly]
+            public NativeArray<bool> batchLocalToWorldDirtyMask;
+
+            [WriteOnly]
+            [NativeDisableParallelForRestriction]
+            public NativeArray<bool> anyDirty;
+
+            public unsafe void Execute(int index, TransformAccess transform)
+            {
+                if (index < length)
+                {
+                    var currLocalToWorld = transform.localToWorldMatrix;
+                    var currLocalToWorld4x4 = *(float4x4*)&currLocalToWorld;
+
+                    if (!currLocalToWorld4x4.Equals(batchLocalToWorldBuffer[index]))
+                    {
+                        batchLocalToWorldBuffer[index] = currLocalToWorld4x4;
+                        batchLocalToWorldDirtyMask[index] = true;
+                        anyDirty[0] = true;
+                    }
                 }
             }
         }

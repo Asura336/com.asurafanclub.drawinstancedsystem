@@ -7,6 +7,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Assertions;
+using UnityEngine.Jobs;
 using UnityEngine.Rendering;
 using static Com.Rendering.DrawInstancedSystemTools;
 using static Unity.Mathematics.math;
@@ -458,6 +459,22 @@ namespace Com.Rendering
             batchLocalToWorldDirty = true;
         }
 
+        public unsafe void WriteBatchLocalToWorld(TransformAccessArray transforms)
+        {
+            var anyDirty = new NativeArray<bool>(1, Allocator.TempJob,
+                NativeArrayOptions.ClearMemory);
+            new SyncBatchLocalToWorldFor
+            {
+                length = batchNumber,
+                batchLocalToWorldBuffer = batchLocalToWorldBuffer.AsArray().Reinterpret<float4x4>(),
+                batchLocalToWorldDirtyMask = batchLocalToWorldDirtyMask.AsArray(),
+                anyDirty = anyDirty,
+            }
+            .ScheduleReadOnly(transforms, 64).Complete();
+
+            batchLocalToWorldDirty = *(bool*)anyDirty.GetUnsafePtr();
+        }
+
         /// <summary>
         /// 为某个批次指定绘制实例个数
         /// </summary>
@@ -611,36 +628,5 @@ namespace Com.Rendering
         //        recieveShadows,
         //        layer);
         //}
-
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static unsafe void Realloc<T>(ref NativeList<T> nativeList, int capacity) where T : unmanaged
-        {
-            if (nativeList.IsCreated)
-            {
-                nativeList.ResizeUninitialized(capacity);
-                nativeList.Length = capacity;
-                if (nativeList.Capacity > capacity)
-                {
-                    nativeList.TrimExcess();
-                }
-            }
-            else
-            {
-                nativeList = new NativeList<T>(capacity, AllocatorManager.Persistent)
-                {
-                    Length = capacity
-                };
-            }
-        }
-        static void Release<T>(NativeList<T> list) where T : unmanaged
-        {
-            if (list.IsCreated) { list.Dispose(); }
-        }
-
-        static void Release<T>(NativeArray<T> list) where T : unmanaged
-        {
-            if (list.IsCreated) { list.Dispose(); }
-        }
     }
 }
