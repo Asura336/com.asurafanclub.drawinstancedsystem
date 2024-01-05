@@ -79,9 +79,9 @@ namespace Com.Rendering
             int length = matrices.Length;
             // 编辑器下分配的缓冲区清空内存，否则可能出现奇怪的结果
             using var minMaxBuffer = new NativeArray<float3x2>(length, Allocator.TempJob,
-                AllocOptions);
+                 NativeArrayOptions.ClearMemory);
             using var minMax2 = new NativeArray<float3>(2, Allocator.TempJob,
-                AllocOptions);
+                 NativeArrayOptions.ClearMemory);
             var job = default(JobHandle);
             job = new CalculateBoundsFor
             {
@@ -131,11 +131,6 @@ namespace Com.Rendering
                 }
             }
         }
-
-        /// <summary>
-        /// 编辑器下分配的缓冲区清空内存，否则可能出现奇怪的结果
-        /// </summary>
-        NativeArrayOptions AllocOptions =>  NativeArrayOptions.ClearMemory;
 
         [BurstCompile(CompileSynchronously = true,
         FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
