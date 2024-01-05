@@ -472,6 +472,7 @@ namespace Com.Rendering
             .ScheduleReadOnly(transforms, 64).Complete();
 
             batchLocalToWorldDirty = *(bool*)anyDirty.GetUnsafePtr();
+            anyDirty.Dispose();
         }
 
         /// <summary>
