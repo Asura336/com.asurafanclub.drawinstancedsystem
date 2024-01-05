@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -346,7 +347,7 @@ namespace Com.Rendering
 
             public unsafe void Execute(int index, TransformAccess transform)
             {
-                if (index < length)
+                if (Hint.Likely(index < length))
                 {
                     var currLocalToWorld = transform.localToWorldMatrix;
                     var currLocalToWorld4x4 = *(float4x4*)&currLocalToWorld;
