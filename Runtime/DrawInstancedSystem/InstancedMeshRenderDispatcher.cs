@@ -23,7 +23,6 @@ namespace Com.Rendering
             public InstancedMeshRenderToken[] savedTokens = new InstancedMeshRenderToken[defaultTokenCapacity];
             //Transform[] transforms = new Transform[defaultTokenCapacity];
             public TransformAccessArray tokenTransforms = new TransformAccessArray(defaultTokenCapacity);
-            public Matrix4x4[] tokenLocalToWorlds = new Matrix4x4[defaultTokenCapacity];
             public int count = 0;
 
             public float accessTimeSinceStartup = 0;
@@ -64,7 +63,6 @@ namespace Com.Rendering
                 {
                     int newCapacity = system.BatchCapacity;
                     Realloc(ref savedTokens, newCapacity);
-                    Realloc(ref tokenLocalToWorlds, newCapacity);
                     //Realloc(ref transforms, newCapacity);
                     Realloc(ref tokenTransforms, newCapacity);
                 }
@@ -73,7 +71,6 @@ namespace Com.Rendering
                 //transforms[count] = token.transform;
                 tokenTransforms.Add(token.transform);
                 //tokenTransforms.SetTransforms(transforms);
-                tokenLocalToWorlds[count] = token.LocalToWorld;
                 token.BatchIndex = addIndex;
                 count++;
 
@@ -103,7 +100,6 @@ namespace Com.Rendering
                 //transforms[count] = default;
                 tokenTransforms.RemoveAtSwapBack(index);
                 //tokenTransforms.SetTransforms(transforms);
-                tokenLocalToWorlds[index] = tokenLocalToWorlds[count];
                 token.BatchIndex = -1;
 
                 // 同步全局记录，因为擦除的做法影响了其他元素的顺序
@@ -165,7 +161,6 @@ namespace Com.Rendering
                 if (disposing)
                 {
                     savedTokens = null;
-                    tokenLocalToWorlds = null;
                 }
                 Release(ref tokenTransforms);
                 system.Dispose();
@@ -334,25 +329,12 @@ namespace Com.Rendering
                     // 2517 times (in 8 levels), 0.19 ms
                     system.WriteBatchLocalToWorld(item.tokenTransforms);
 
-                    // 
-                    //var tokenLocalToWorlds = item.tokenLocalToWorlds;
                     int count = item.count;
                     for (int ti = 0; ti < count; ti++)
                     {
                         var token = item.savedTokens[ti];
                         //if (token is null) { continue; }
                         int batchIndex = token.BatchIndex;
-
-                        // 取变换，判等
-                        // 2517 times, 4.54 ms + 1.22 ms
-                        //Matrix4x4 tokenLocalToWorld = default;
-                        //token.GetLocalToWorld(ref tokenLocalToWorld);
-                        ////var tokenLocalToWorld = token.LocalToWorld;
-                        //if (!EqualsMatrix4x4(tokenLocalToWorld, tokenLocalToWorlds[ti]))
-                        //{
-                        //    tokenLocalToWorlds[ti] = tokenLocalToWorld;
-                        //    system.WriteBatchLocalToWorldAt(batchIndex, tokenLocalToWorld);
-                        //}
 
                         // 形状变化的情况在调用 Evaluate() 里处理
                         //if (token.InstanceUpdated)

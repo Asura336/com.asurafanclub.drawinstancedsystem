@@ -34,10 +34,6 @@ namespace Com.Rendering
         [SerializeField] int count;
 
         [SerializeField] int virtualBatchIndex;
-        /// <summary>
-        /// 不自动更新变换矩阵
-        /// </summary>
-        [SerializeField] bool transformStatic;
         Matrix4x4 cachedLocalToWorld = Matrix4x4.identity;
 
         Transform cachedTransform;
@@ -66,7 +62,6 @@ namespace Com.Rendering
         {
             if (!enableCalled)
             {
-                UpdateLocalToWorld();
                 Wakeup();
             }
         }
@@ -84,7 +79,6 @@ namespace Com.Rendering
         private void OnEnable()
         {
             Active = true;
-            UpdateLocalToWorld();
             Wakeup();
             enableCalled = true;
         }
@@ -301,43 +295,7 @@ namespace Com.Rendering
 
         public int Capacity => localOffsets?.Length ?? 0;
 
-        public void UpdateLocalToWorld()
-        {
-            if (transformStatic)
-            {
-                cachedLocalToWorld = cachedTransform.localToWorldMatrix;
-            }
-        }
-        public void UpdateLocalToWorld(in Matrix4x4 localToWorld)
-        {
-            if (transformStatic)
-            {
-                cachedLocalToWorld = localToWorld;
-            }
-        }
-
-        public Matrix4x4 LocalToWorld => transformStatic
-            ? cachedLocalToWorld
-            : cachedLocalToWorld = cachedTransform.localToWorldMatrix;
-        public void GetLocalToWorld(ref Matrix4x4 localToWorld)
-        {
-            // 2517 times, 4.48 ms
-            if (!transformStatic)
-            {
-                cachedLocalToWorld = cachedTransform.localToWorldMatrix;
-            }
-            CopyMatrix(cachedLocalToWorld, ref localToWorld);
-
-            //// 2517 times, 8.53 ms
-            //localToWorld = transformStatic
-            //? cachedLocalToWorld
-            //: cachedLocalToWorld = cachedTransform.localToWorldMatrix;
-        }
-        [BurstCompile]
-        static void CopyMatrix(in Matrix4x4 src, ref Matrix4x4 dst)
-        {
-            dst = src;
-        }
+        public Matrix4x4 LocalToWorld => cachedTransform.localToWorldMatrix;
 
         public bool Active { get; private set; }
 
