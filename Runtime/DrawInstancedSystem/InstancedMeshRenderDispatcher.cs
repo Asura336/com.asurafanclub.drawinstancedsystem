@@ -585,7 +585,9 @@ namespace Com.Rendering
         /// <see cref="InstancedMeshRenderDispatcher">绘制实例调度器</see>
         /// 和 <see cref="InstancedMeshRenderToken">绘制实例符号</see>
         /// </summary>
+#if UNITY_EDITOR
         [UnityEditor.MenuItem("绘制实例系统/重启当前场景的组件")]
+#endif
         public static void RestartGlobal()
         {
             ClearGlobal(out var allDispatchers);

@@ -208,6 +208,7 @@ Shader "URP/Instanced/InstancedLit"
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
+            #pragma instancing_options renderinglayer
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
 
             // -------------------------------------
@@ -330,7 +331,8 @@ Shader "URP/Instanced/InstancedLit"
             // -------------------------------------
             // Shader Stages
             #pragma vertex DepthOnlyVertex
-            #pragma fragment DepthOnlyFragment
+            #pragma fragment DepthOnlyFragment            
+            #pragma instancing_options procedural:ConfigureProcedural
 
             // -------------------------------------
             // Material Keywords
@@ -345,6 +347,10 @@ Shader "URP/Instanced/InstancedLit"
             // GPU Instancing
             #pragma multi_compile_instancing
             #pragma multi_compile _ PROCEDURAL_INSTANCING_ON
+            //--------------------------------------
+            // GPU Instancing
+            #pragma multi_compile_instancing
+            #pragma instancing_options renderinglayer
 
             // -------------------------------------
             // Includes
@@ -394,7 +400,8 @@ Shader "URP/Instanced/InstancedLit"
 
             //--------------------------------------
             // GPU Instancing
-            #pragma multi_compile_instancing
+            #pragma multi_compile_instancing            
+            #pragma instancing_options renderinglayer
             #pragma multi_compile _ PROCEDURAL_INSTANCING_ON
 
             // -------------------------------------
