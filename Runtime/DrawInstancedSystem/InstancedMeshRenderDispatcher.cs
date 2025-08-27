@@ -280,7 +280,8 @@ namespace Com.Rendering
                 throw new ArgumentException($"调度器 \"{dispatcherName}\" 名称冲突或者重复注册");
             }
             sharedInstances.Add(dispatcherName, this);
-            OnDispatcherEnabled?.Invoke(dispatcherName);
+            //OnDispatcherEnabled?.Invoke(dispatcherName);
+            InvokeOnDispatcherEnabled(dispatcherName);
             Active = true;
             //print($"{dispatcherName} enabled");
         }
@@ -290,7 +291,8 @@ namespace Com.Rendering
             if (Active)
             {
                 Active = false;
-                OnBeforeDispatcherDisable?.Invoke(dispatcherName);
+                //OnBeforeDispatcherDisable?.Invoke(dispatcherName);
+                InvokeOnBeforeDispatcherDisable(dispatcherName);
                 sharedInstances.Remove(dispatcherName);
 
                 // 编辑器模式下重载程序域时卸载 levels
@@ -315,11 +317,13 @@ namespace Com.Rendering
             }
         }
 
-        private void Update()
+        private unsafe void Update()
         {
             int sysLen = levels.Length;
+            int frameCount = Time.renderedFrameCount;
+
             for (int i = 0; i < sysLen; i++)
-            {
+            { 
                 var item = levels[i];
                 if (item != null)
                 {
@@ -332,6 +336,8 @@ namespace Com.Rendering
                     int count = item.count;
                     for (int ti = 0; ti < count; ti++)
                     {
+                        if (ti % frameCount != 3) { continue; }
+
                         var token = item.savedTokens[ti];
                         //if (token is null) { continue; }
                         int batchIndex = token.BatchIndex;
@@ -344,7 +350,7 @@ namespace Com.Rendering
                         //}
                         if (token.VolumeUpdated)
                         {
-                            system.WriteLocalBoundsAt(batchIndex, token.LocalBounds);
+                            system.WriteLocalBoundsAt(batchIndex, token.ReadLocalBounds);
                         }
                         if (token.MaterialPropertyUpdated)
                         {
@@ -352,11 +358,16 @@ namespace Com.Rendering
                             // if other properties...
                         }
                     }
-                    system.Update();
 
                     // 如果有一段时间（150s，两分半钟）没有增删对象，调用一次出让内存
                     item.TrimExcessOnUpdate();
                 }
+            }
+
+            for (int i = 0; i < levels.Length; i++)
+            {
+                var level = levels[i];
+                level?.system?.Update();
             }
         }
 
@@ -561,9 +572,11 @@ namespace Com.Rendering
         }
         static void WriteToRenderSystem(InstancedMeshRenderSystem renderSystem, InstancedMeshRenderToken token, int batchIndex)
         {
-            renderSystem.WriteBatchLocalToWorldAt(batchIndex, token.LocalToWorld);
+            Matrix4x4 tokenLocalToWorld = default;
+            token.ReadLocalToWorld(ref tokenLocalToWorld);
+            renderSystem.WriteBatchLocalToWorldAt(batchIndex, tokenLocalToWorld);
             renderSystem.WriteBatchCountAt(batchIndex, token.Count);
-            renderSystem.WriteLocalBoundsAt(batchIndex, token.LocalBounds);
+            renderSystem.WriteLocalBoundsAt(batchIndex, token.ReadLocalBounds);
             renderSystem.WriteLocalOffsetAt(batchIndex, token.localOffsets, 0, token.Count);
             renderSystem.WriteBatchColorAt(batchIndex, token.InstanceColorGamma);
             // if other material properties...
@@ -661,17 +674,47 @@ namespace Com.Rendering
 #endif
 
 
+        const int k_eventBufferCapacity = 1024;
+
+        static readonly HashSet<Action<string>> sbuffer_OnDispatcherEnabled = new(k_eventBufferCapacity);
+        static void InvokeOnDispatcherEnabled(string arg)
+        {
+            if (sbuffer_OnDispatcherEnabled.Count is 0) { return; }
+            foreach (var e in sbuffer_OnDispatcherEnabled)
+            {
+                e?.Invoke(arg);
+            }
+        }
+
+        static readonly HashSet<Action<string>> sbuffer_OnBeforeDispatcherDisable = new(k_eventBufferCapacity);
+        static void InvokeOnBeforeDispatcherDisable(string arg)
+        {
+            if (sbuffer_OnBeforeDispatcherDisable.Count is 0) { return; }
+            foreach (var e in sbuffer_OnBeforeDispatcherDisable)
+            {
+                e?.Invoke(arg);
+            }
+        }
+
         /// <summary>
         /// 通知所有 <see cref="InstancedMeshRenderToken">绘制实例符号</see>
         /// 特定名称的 <see cref="InstancedMeshRenderDispatcher">绘制实例调度器</see>
         /// 被激活
         /// </summary>
-        public static event Action<string> OnDispatcherEnabled;
+        public static event Action<string> OnDispatcherEnabled
+        {
+            add => sbuffer_OnDispatcherEnabled.Add(value);
+            remove => sbuffer_OnDispatcherEnabled.Remove(value);
+        }
         /// <summary>
         /// 通知所有 <see cref="InstancedMeshRenderToken">绘制实例符号</see>
         /// 特定名称的 <see cref="InstancedMeshRenderDispatcher">绘制实例调度器</see>
         /// 被禁用
         /// </summary>
-        public static event Action<string> OnBeforeDispatcherDisable;
+        public static event Action<string> OnBeforeDispatcherDisable
+        {
+            add => sbuffer_OnBeforeDispatcherDisable.Add(value);
+            remove => sbuffer_OnBeforeDispatcherDisable.Remove(value);
+        }
     }
 }

@@ -566,7 +566,7 @@ namespace Com.Rendering
             get => batchNumber;
             set
             {
-                Assert.IsTrue(value < batchCapacity + 1, $"length <= {batchCapacity}");
+                Assert.IsTrue(value < batchCapacity + 1);  // $"length <= {batchCapacity}"
                 batchNumber = value;
                 instanceNumber = batchNumber * batchSize;
                 //Debug.Log($"set batch number = {value}, batchSize = {batchSize}");

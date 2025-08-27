@@ -293,9 +293,13 @@ namespace Com.Rendering
         public bool IsSingleInstance => batchSize == 1 && count == 1
             && Capacity > 0 && EqualsMatrix4x4(localOffsets[0], Matrix4x4.identity);
 
-        public int Capacity => localOffsets?.Length ?? 0;
+        public int Capacity => localOffsets is null ? 0 : localOffsets.Length;
 
         public Matrix4x4 LocalToWorld => cachedTransform.localToWorldMatrix;
+        public void ReadLocalToWorld(ref Matrix4x4 localToWorld)
+        {
+            localToWorld = cachedTransform.localToWorldMatrix;
+        }
 
         public bool Active { get; private set; }
 
@@ -336,6 +340,8 @@ namespace Com.Rendering
                 }
             }
         }
+
+        public ref readonly Bounds ReadLocalBounds => ref localBounds;
 
         /// <summary>
         /// 实例的颜色，简单起见为单个批次应用相同的颜色。
