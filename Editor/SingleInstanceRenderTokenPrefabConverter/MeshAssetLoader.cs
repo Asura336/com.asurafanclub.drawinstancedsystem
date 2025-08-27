@@ -13,7 +13,9 @@ namespace Com.Rendering.Editor
         public const string transparentMaterialPath = EditorConstants.packagePath
             + "/Editor/Materials/Lit_Instanced_Transparent.mat";
 
-        public static Material MatchInstancedMaterial(Material src)
+        public static Material MatchInstancedMaterial(Material src,
+            Material opaqueOverrideSource = null,
+            Material transparentOverrideSource = null)
         {
             bool transparentMat = src.renderQueue > (int)RenderQueue.AlphaTest - 1;
             string matAssetPath = transparentMat

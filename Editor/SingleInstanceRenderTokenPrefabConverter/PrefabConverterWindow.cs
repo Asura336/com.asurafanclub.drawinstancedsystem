@@ -213,7 +213,9 @@ namespace Com.Rendering.Editor
 
                 // save prefab
                 string prefabPath = outputPath + $"/{src.name}_Instanced.prefab";
-                prefabPath = AssetDatabase.GenerateUniqueAssetPath(prefabPath);
+                var uniquePrefabPath = AssetDatabase.GenerateUniqueAssetPath(prefabPath);
+                prefabPath = string.IsNullOrEmpty(uniquePrefabPath)
+                    ? prefabPath : uniquePrefabPath;
                 PrefabUtility.SaveAsPrefabAsset(ins, prefabPath);
                 AssetDatabase.Refresh();
             }
