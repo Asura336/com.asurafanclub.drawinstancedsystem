@@ -189,7 +189,7 @@ namespace Com.Rendering
                 batchIndex = token.BatchIndex;
             }
 
-            public readonly bool Equals(TokenInfo other) => savedDispatcher == other.savedDispatcher
+            public readonly bool Equals(TokenInfo other) => ReferenceEquals(savedDispatcher, other.savedDispatcher)
                 && systemLevel == other.systemLevel
                 && batchIndex == other.batchIndex;
         }

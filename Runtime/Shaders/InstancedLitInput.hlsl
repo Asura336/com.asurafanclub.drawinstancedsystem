@@ -295,6 +295,11 @@
             UNITY_MATRIX_M = _LocalToWorldBuffer[unity_InstanceID];
             UNITY_MATRIX_I_M = _WorldToLocalBuffer[unity_InstanceID];
         #endif
+
+        #if SHADERPASS == SHADERPASS_MOTION_VECTORS && defined(SHADERPASS_CS_HLSL)
+            unity_MatrixPreviousM = unity_ObjectToWorld;
+            unity_MatrixPreviousMI = unity_WorldToObject;
+        #endif
     }
 
 #endif // ASURAFANCLUB_INSTANCED_LIT_INPUT_INCLUDED

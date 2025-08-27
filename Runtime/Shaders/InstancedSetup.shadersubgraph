@@ -140,7 +140,7 @@
     "m_SourceType": 1,
     "m_FunctionName": "dummy",
     "m_FunctionSource": "",
-    "m_FunctionBody": "OUT = IN;\n\n#pragma instancing_options renderinglayer procedural:ConfigureProcedural\n"
+    "m_FunctionBody": "OUT = IN;\n\n#pragma editor_sync_compilation\r\n#pragma multi_compile_instancing\r\n#pragma multi_compile _ LOD_FADE_CROSSFADE\r\n#pragma shader_feature_local INSTANCED_COLOR\r\n#pragma instancing_options renderinglayer procedural:ConfigureProcedural\r\n#define UNITY_INSTANCING_PROCEDURAL_FUNC ConfigureProcedural"
 }
 
 {
