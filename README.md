@@ -1,8 +1,10 @@
-# Draw Instanced System (URP)
+# Draw Instanced System (SRP)
 
 `Graphics.DrawMeshInstancedProcedural` 的包装器，旨在使用实例化绘制时减少提交数据给 GPU 的频率。
 
 此版本适配 URP，内部的绘制方法适应新版本引擎替换为 `Graphics.RenderMeshPrimitives`，绘制效率一致。
+
+__[2025-08-27]__：增加 Shader Graph 实现的实例化材质，现在可通过 Shader Graph 着色器兼容 HDRP。
 
 测试用例绘制的物体约 72M 个顶点，提交 2500 个调用批次，帧时间约 12ms
 
