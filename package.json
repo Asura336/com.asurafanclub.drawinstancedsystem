@@ -1,10 +1,11 @@
 {
   "name": "com.asurafanclub.drawinstancedsystem",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "displayName": "DrawInstancedSystem",
   "description": "\u81ea\u5b9a\u4e49\u5408\u6279\u7684\u5b9e\u4f8b\u5316\u7ed8\u5236\u5305\u88c5\uff0c\u5bf9\u5e94 SRP\u3002\u5305\u542b\u5b9a\u5236\u7684 URP \u5149\u7167\u7740\u8272\u5668\u793a\u4f8b\u548c Shader Graph \u793a\u4f8b",
   "unity": "2022.3",
   "dependencies": {
-    "com.unity.collections": "2.1.4"
+    "com.unity.collections": "2.1.4",
+    "com.unity.shadergraph": "14.0.9"
   }
 }
