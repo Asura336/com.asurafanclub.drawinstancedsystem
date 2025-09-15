@@ -34,6 +34,9 @@
     "m_Keywords": [
         {
             "m_Id": "dd712b62d08548fd882e0fae6449b35f"
+        },
+        {
+            "m_Id": "1c2672c7ea8e4246a6c9d25590576e37"
         }
     ],
     "m_Dropdowns": [],
@@ -1158,6 +1161,9 @@
         },
         {
             "m_Id": "dd712b62d08548fd882e0fae6449b35f"
+        },
+        {
+            "m_Id": "1c2672c7ea8e4246a6c9d25590576e37"
         }
     ]
 }
@@ -1224,6 +1230,31 @@
         "m_SerializableColors": []
     },
     "m_SerializedDescriptor": "VertexDescription.Normal"
+}
+
+{
+    "m_SGVersion": 1,
+    "m_Type": "UnityEditor.ShaderGraph.ShaderKeyword",
+    "m_ObjectId": "1c2672c7ea8e4246a6c9d25590576e37",
+    "m_Guid": {
+        "m_GuidSerialized": "9c1278fb-5303-4e48-b48b-68780f62d4df"
+    },
+    "m_Name": "PROCEDURAL_INSTANCING_ON",
+    "m_DefaultRefNameVersion": 1,
+    "m_RefNameGeneratedByDisplayName": "PROCEDURAL_INSTANCING_ON",
+    "m_DefaultReferenceName": "_PROCEDURAL_INSTANCING_ON",
+    "m_OverrideReferenceName": "PROCEDURAL_INSTANCING_ON",
+    "m_GeneratePropertyBlock": true,
+    "m_UseCustomSlotLabel": false,
+    "m_CustomSlotLabel": "",
+    "m_DismissedVersion": 0,
+    "m_KeywordType": 0,
+    "m_KeywordDefinition": 1,
+    "m_KeywordScope": 1,
+    "m_KeywordStages": 1,
+    "m_Entries": [],
+    "m_Value": 1,
+    "m_IsEditable": true
 }
 
 {
