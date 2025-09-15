@@ -16,10 +16,10 @@ namespace Com.Rendering
         protected InstancedMeshRenderToken token;
 
         // 需要在继承类指定每维度的数量限制
-        [SerializeField] protected Vector3 basePoint;
-        [SerializeField] protected Vector3 distances;
-        [SerializeField] protected Vector3 euler;
-        [SerializeField] protected Vector3 scale = Vector3.one;
+        public Vector3 basePoint;
+        public Vector3 distances;
+        public Vector3 euler;
+        public Vector3 scale = Vector3.one;
 
         protected virtual void Awake()
         {

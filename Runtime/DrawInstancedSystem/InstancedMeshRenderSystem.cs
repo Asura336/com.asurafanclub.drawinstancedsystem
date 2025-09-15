@@ -198,7 +198,7 @@ namespace Com.Rendering
                 if (batchLocalToWorldDirty || instanceLocalOffsetDirty)
                 {
                     // trs = mul(localOffset, localToWorld)
-                    new MulTrsJobFor
+                    var job_mulTrs = new MulTrsJobFor
                     {
                         batchSize = batchSize,
                         batchLocalToWorld = batchLocalToWorldReader,
@@ -207,7 +207,7 @@ namespace Com.Rendering
                         instLocalOffset = instanceLocalOffsetBuffer.AsParallelReader(),
                         instLocalToWorld = instanceLocalToWorldBuffer.AsParallelWriter(),
                         instWorldToLocal = instanceWorldToLocalBuffer.AsParallelWriter(),
-                    }.Schedule(instanceNumber, 64, default).Complete();
+                    }; job_mulTrs.ScheduleByRef(instanceNumber, 64, default).Complete();
 
                     instanceVisibleDirty = true;
                 }
@@ -217,22 +217,26 @@ namespace Com.Rendering
                 {
                     using var outputMinMax = new NativeArray<float3x2>(batchNumber,
                         Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                    var job = new TransposeBoundsFor
+                    JobHandle job = default;
+                    var job_transBounds = new TransposeBoundsFor
                     {
                         localToWorld = batchLocalToWorldReader,
                         inputLocalBounds = batchLocalBoundsBuffer.AsParallelReader().Reinterpret<float3x2>(),
                         outputWorldMinMax = outputMinMax
-                    }.Schedule(batchNumber, 64, default);
+                    };
+                    job = job_transBounds.ScheduleByRef(batchNumber, 64, job);
 
                     var vMinMax = new NativeArray<float3>(2,
                       Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                     vMinMax[0] = float3(float.MaxValue);
                     vMinMax[1] = float3(float.MinValue);
-                    new BoundsMinMaxJobFor
+                    var job_minMax = new BoundsMinMaxJobFor
                     {
                         srcMinMax = outputMinMax,
                         minMax2 = vMinMax
-                    }.Schedule(batchNumber, job).Complete();
+                    };
+                    job = job_minMax.ScheduleByRef(batchNumber, job);
+                    job.Complete();
 
                     var pMinMax = (float3*)vMinMax.GetUnsafeReadOnlyPtr();
                     MinMax2Bounds(pMinMax[0], pMinMax[1], ref cachedWorldBounds);
@@ -258,20 +262,20 @@ namespace Com.Rendering
                 using var instanceWorldToLocalIndirectBuffer = new NativeArray<float4x4>(instanceNumber,
                     Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
-                var _job = default(JobHandle);
-                _job = new CopyMatrixBufferFor
+                var job = default(JobHandle);
+                var job_copyLocalToWorld = new CopyMatrixBufferFor
                 {
                     indirectIndexMap = instanceIndirectIndexMap.AsParallelReader(),
                     src = instanceLocalToWorldBuffer.AsReadOnly(),
                     dst = instanceLocalToWorldIndirectBuffer,
-                }.Schedule(visibleNumber, 128, _job);
-                _job = new CopyMatrixBufferFor
+                }; job = job_copyLocalToWorld.ScheduleByRef(visibleNumber, 128, job);
+                var job_copyWorldToLocal = new CopyMatrixBufferFor
                 {
                     indirectIndexMap = instanceIndirectIndexMap.AsParallelReader(),
                     src = instanceWorldToLocalBuffer.AsReadOnly(),
                     dst = instanceWorldToLocalIndirectBuffer,
-                }.Schedule(visibleNumber, 128, _job);
-                _job.Complete();
+                }; job = job_copyWorldToLocal.ScheduleByRef(visibleNumber, 128, job);
+                job.Complete();
 
                 SetData(loadlToWorldBuffer, instanceLocalToWorldIndirectBuffer, visibleNumber);
                 SetData(worldToLocalBuffer, instanceWorldToLocalIndirectBuffer, visibleNumber);
@@ -285,12 +289,12 @@ namespace Com.Rendering
             {
                 using var instanceIndirectColorBuffer = new NativeArray<float4>(instanceNumber,
                     Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                new CopyVectorFieldsFor
+                var job_copyInstanceColor = new CopyVectorFieldsFor
                 {
                     indirectIndexMap = instanceIndirectIndexMap.AsParallelReader(),
                     src = instanceColorBuffer.AsReadOnly(),
                     dst = instanceIndirectColorBuffer,
-                }.Schedule(visibleNumber, 128).Complete();
+                }; job_copyInstanceColor.ScheduleByRef(visibleNumber, 128).Complete();
                 SetData(colorsBuffer, instanceIndirectColorBuffer, visibleNumber);
                 instanceColorDirty = false;
             }
