@@ -10,13 +10,14 @@ using UnityEngine.Assertions;
 using UnityEngine.Jobs;
 using UnityEngine.Rendering;
 using static Com.Rendering.DrawInstancedSystemTools;
+using static Unity.Collections.LowLevel.Unsafe.NativeArrayUnsafeUtility;
 using static Unity.Mathematics.math;
 
 namespace Com.Rendering
 {
     [BurstCompile(CompileSynchronously = true,
         FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Standard)]
-    public sealed class InstancedMeshRenderSystem : IDisposable
+    public unsafe sealed class InstancedMeshRenderSystem : IDisposable
     {
         /// <summary>
         /// 每批次数量，内部缓冲区按这个长度分片
@@ -41,46 +42,54 @@ namespace Com.Rendering
         /// <summary>
         /// [job system input] 所有 batch 的基点变换
         /// </summary>
-        NativeList<float4x4> batchLocalToWorldBuffer;
+        NativeArray<float4x4> batchLocalToWorldBuffer;
+        float4x4* batchLocalToWorldBufferPnt;
         /// <summary>
         /// [job system input] 所有 batch 的基点被写入
         /// </summary>
-        NativeList<bool> batchLocalToWorldDirtyMask;
+        NativeArray<bool> batchLocalToWorldDirtyMask;
+        bool* batchLocalToWorldDirtyMaskPnt;
         /// <summary>
         /// [job system input] 每 batch 的实际绘制数目
         /// </summary>
-        NativeList<int> batchCountBuffer;
+        NativeArray<int> batchCountBuffer;
+        int* batchCountBufferPnt;
 
         /// <summary>
         /// [job system input] 所有 batch 的本地包围盒
         /// </summary>
-        NativeList<Bounds> batchLocalBoundsBuffer;
+        NativeArray<Bounds> batchLocalBoundsBuffer;
+        Bounds* batchLocalBoundsBufferPnt;
 
         /// <summary>
         /// [job system input] 所有 instance 相对 batch 的本地偏移
         /// </summary>
-        NativeList<float4x4> instanceLocalOffsetBuffer;
+        NativeArray<float4x4> instanceLocalOffsetBuffer;
+        float4x4* instanceLocalOffsetBufferPnt;
 
         /// <summary>
         /// [job system output] 所有 instance 的本地空间到世界空间变换。
         ///缓存这个变换，移除物体时可以不重计算变换。
         /// </summary>
-        NativeList<float4x4> instanceLocalToWorldBuffer;
+        NativeArray<float4x4> instanceLocalToWorldBuffer;
+        float4x4* instanceLocalToWorldBufferPnt;
         /// <summary>
         /// [job system output] 所有 instance 的世界空间到本地空间变换。
         /// 缓存这个变换，移除物体时可以不重计算变换。
         /// </summary>
-        NativeList<float4x4> instanceWorldToLocalBuffer;
+        NativeArray<float4x4> instanceWorldToLocalBuffer;
+        float4x4* instanceWorldToLocalBufferPnt;
 
         /// <summary>
         /// 所有 keeper 持有的实例的颜色
         /// </summary>
-        NativeList<float4> instanceColorBuffer;
+        NativeArray<float4> instanceColorBuffer;
+        float4* instanceColorBufferPnt;
 
         /// <summary>
         /// [job system output] 所有 instance 从分片内存传递到连续内存的映射
         /// </summary>
-        NativeList<int> instanceIndirectIndexMap;
+        NativeArray<int> instanceIndirectIndexMap;
 
         bool _disposed;
 
@@ -156,15 +165,15 @@ namespace Com.Rendering
             colorsBuffer?.Dispose();
             colorsBuffer = null;
 
-            Release(ref batchLocalToWorldBuffer);
-            Release(ref batchLocalToWorldDirtyMask);
-            Release(ref batchCountBuffer);
+            Release(ref batchLocalToWorldBuffer); batchLocalToWorldBufferPnt = null;
+            Release(ref batchLocalToWorldDirtyMask); batchLocalToWorldDirtyMaskPnt = null;
+            Release(ref batchCountBuffer); batchCountBufferPnt = null;
 
-            Release(ref instanceLocalOffsetBuffer);
-            Release(ref instanceLocalToWorldBuffer);
-            Release(ref instanceWorldToLocalBuffer);
-            Release(ref batchLocalBoundsBuffer);
-            Release(ref instanceColorBuffer);
+            Release(ref instanceLocalOffsetBuffer); instanceLocalOffsetBufferPnt = null;
+            Release(ref instanceLocalToWorldBuffer); instanceLocalOffsetBufferPnt = null;
+            Release(ref instanceWorldToLocalBuffer); instanceWorldToLocalBufferPnt = null;
+            Release(ref batchLocalBoundsBuffer); batchLocalBoundsBufferPnt = null;
+            Release(ref instanceColorBuffer); instanceColorBufferPnt = null;
 
             Release(ref instanceIndirectIndexMap);
 
@@ -192,7 +201,7 @@ namespace Com.Rendering
 
             if (instanceLocalOffsetDirty || batchLocalToWorldDirty || batchLocalBoundsDirty)
             {
-                var batchLocalToWorldReader = batchLocalToWorldBuffer.AsParallelReader();
+                var batchLocalToWorldReader = batchLocalToWorldBuffer.AsReadOnly();
 
                 // 移动了物体，或者有物体改变形状
                 if (batchLocalToWorldDirty || instanceLocalOffsetDirty)
@@ -202,11 +211,11 @@ namespace Com.Rendering
                     {
                         batchSize = batchSize,
                         batchLocalToWorld = batchLocalToWorldReader,
-                        batchLocalToWorldDirty = batchLocalToWorldDirtyMask.AsParallelReader(),
-                        batchCount = batchCountBuffer.AsParallelReader(),
-                        instLocalOffset = instanceLocalOffsetBuffer.AsParallelReader(),
-                        instLocalToWorld = instanceLocalToWorldBuffer.AsParallelWriter(),
-                        instWorldToLocal = instanceWorldToLocalBuffer.AsParallelWriter(),
+                        batchLocalToWorldDirty = batchLocalToWorldDirtyMask.AsReadOnly(),
+                        batchCount = batchCountBuffer.AsReadOnly(),
+                        instLocalOffset = instanceLocalOffsetBuffer.AsReadOnly(),
+                        instLocalToWorld = instanceLocalToWorldBuffer,
+                        instWorldToLocal = instanceWorldToLocalBuffer,
                     }; job_mulTrs.ScheduleByRef(instanceNumber, 64, default).Complete();
 
                     instanceVisibleDirty = true;
@@ -221,7 +230,7 @@ namespace Com.Rendering
                     var job_transBounds = new TransposeBoundsFor
                     {
                         localToWorld = batchLocalToWorldReader,
-                        inputLocalBounds = batchLocalBoundsBuffer.AsParallelReader().Reinterpret<float3x2>(),
+                        inputLocalBounds = batchLocalBoundsBuffer.AsReadOnly().Reinterpret<float3x2>(),
                         outputWorldMinMax = outputMinMax
                     };
                     job = job_transBounds.ScheduleByRef(batchNumber, 64, job);
@@ -248,14 +257,14 @@ namespace Com.Rendering
                 batchLocalToWorldDirty =
                 batchLocalBoundsDirty = false;
 
-                UnsafeUtility.MemClear(batchLocalToWorldDirtyMask.GetUnsafePtr(), batchNumber);
+                UnsafeUtility.MemClear(batchLocalToWorldDirtyMaskPnt, batchNumber);
             }
 
             if (instanceVisibleDirty)
             {
                 MakeIndirectIndexMap(instanceNumber, batchSize,
-                    batchCountBuffer.GetUnsafePtr(),
-                    ref visibleNumber, instanceIndirectIndexMap.GetUnsafePtr());
+                    batchCountBufferPnt,
+                    ref visibleNumber, (int*)GetUnsafeBufferPointerWithoutChecks(instanceIndirectIndexMap));
 
                 using var instanceLocalToWorldIndirectBuffer = new NativeArray<float4x4>(instanceNumber,
                     Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
@@ -265,13 +274,13 @@ namespace Com.Rendering
                 var job = default(JobHandle);
                 var job_copyLocalToWorld = new CopyMatrixBufferFor
                 {
-                    indirectIndexMap = instanceIndirectIndexMap.AsParallelReader(),
+                    indirectIndexMap = instanceIndirectIndexMap.AsReadOnly(),
                     src = instanceLocalToWorldBuffer.AsReadOnly(),
                     dst = instanceLocalToWorldIndirectBuffer,
                 }; job = job_copyLocalToWorld.ScheduleByRef(visibleNumber, 128, job);
                 var job_copyWorldToLocal = new CopyMatrixBufferFor
                 {
-                    indirectIndexMap = instanceIndirectIndexMap.AsParallelReader(),
+                    indirectIndexMap = instanceIndirectIndexMap.AsReadOnly(),
                     src = instanceWorldToLocalBuffer.AsReadOnly(),
                     dst = instanceWorldToLocalIndirectBuffer,
                 }; job = job_copyWorldToLocal.ScheduleByRef(visibleNumber, 128, job);
@@ -291,7 +300,7 @@ namespace Com.Rendering
                     Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                 var job_copyInstanceColor = new CopyVectorFieldsFor
                 {
-                    indirectIndexMap = instanceIndirectIndexMap.AsParallelReader(),
+                    indirectIndexMap = instanceIndirectIndexMap.AsReadOnly(),
                     src = instanceColorBuffer.AsReadOnly(),
                     dst = instanceIndirectColorBuffer,
                 }; job_copyInstanceColor.ScheduleByRef(visibleNumber, 128).Complete();
@@ -321,7 +330,6 @@ namespace Com.Rendering
 
         /// <summary>
         /// 重设长度，不会改动已有的数据，没有安全检查。
-        ///<see cref="NativeList{T}"/> 的内存分配器实现一定会分配容量为2次幂的长度，不用刻意凑整。
         /// </summary>
         /// <param name="capacity"></param>
         public void Setup(int capacity)
@@ -333,18 +341,26 @@ namespace Com.Rendering
             {
                 // grows up
                 Realloc(ref instanceLocalOffsetBuffer, instanceCapacity);
+                instanceLocalOffsetBufferPnt = (float4x4*)GetUnsafeBufferPointerWithoutChecks(instanceLocalOffsetBuffer);
                 //Realloc(ref instanceVisibleBuffer, instanceCapacity);
                 Realloc(ref instanceLocalToWorldBuffer, instanceCapacity);
+                instanceLocalToWorldBufferPnt = (float4x4*)GetUnsafeBufferPointerWithoutChecks(instanceLocalToWorldBuffer);
                 Realloc(ref instanceWorldToLocalBuffer, instanceCapacity);
+                instanceWorldToLocalBufferPnt = (float4x4*)GetUnsafeBufferPointerWithoutChecks(instanceWorldToLocalBuffer);
                 Realloc(ref instanceColorBuffer, instanceCapacity);
+                instanceColorBufferPnt = (float4*)GetUnsafeBufferPointerWithoutChecks(instanceColorBuffer);
 
                 Realloc(ref instanceIndirectIndexMap, instanceCapacity);
 
                 Realloc(ref batchLocalToWorldBuffer, capacity);
+                batchLocalToWorldBufferPnt = (float4x4*)GetUnsafeBufferPointerWithoutChecks(batchLocalToWorldBuffer);
                 Realloc(ref batchLocalToWorldDirtyMask, capacity);
+                batchLocalToWorldDirtyMaskPnt = (bool*)GetUnsafeBufferPointerWithoutChecks(batchLocalToWorldDirtyMask);
                 Realloc(ref batchCountBuffer, capacity);
+                batchCountBufferPnt = (int*)GetUnsafeBufferPointerWithoutChecks(batchCountBuffer);
 
                 Realloc(ref batchLocalBoundsBuffer, capacity);
+                batchLocalBoundsBufferPnt = (Bounds*)GetUnsafeBufferPointerWithoutChecks(batchLocalBoundsBuffer);
 
                 // 重分配，附加缓冲区
                 loadlToWorldBuffer?.Dispose();
@@ -431,7 +447,7 @@ namespace Com.Rendering
         /// <param name="length"></param>
         public unsafe void WriteLocalOffsetAt(int index, Matrix4x4* pSrc, int start, int length)
         {
-            var ptr = (Matrix4x4*)instanceLocalOffsetBuffer.GetUnsafePtr();
+            var ptr = (Matrix4x4*)instanceLocalOffsetBufferPnt;
             int instanceStart = index * batchSize;
             UnsafeUtility.MemCpy(ptr + instanceStart, pSrc + start, sizeofFloat4x4 * length);
             instanceLocalOffsetDirty = true;
@@ -444,7 +460,7 @@ namespace Com.Rendering
         /// <param name="localBounds"></param>
         public void WriteLocalBoundsAt(int index, in Bounds localBounds)
         {
-            batchLocalBoundsBuffer[index] = localBounds;
+            batchLocalBoundsBufferPnt[index] = localBounds;
             batchLocalBoundsDirty = true;
         }
 
@@ -455,10 +471,17 @@ namespace Com.Rendering
         /// <param name="localToWorld"></param>
         public unsafe void WriteBatchLocalToWorldAt(int index, in Matrix4x4 localToWorld)
         {
-            var ptr = (Matrix4x4*)batchLocalToWorldBuffer.GetUnsafePtr();
-            bool* maskPtr = (bool*)batchLocalToWorldDirtyMask.GetUnsafePtr();
+            var ptr = (Matrix4x4*)batchLocalToWorldBufferPnt;
+            bool* maskPtr = batchLocalToWorldDirtyMaskPnt;
             ptr[index] = localToWorld;
             maskPtr[index] = true;
+            batchLocalToWorldDirty = true;
+        }
+        internal unsafe void WriteBatchLocalToWorldAtPnt(int index, Matrix4x4* localToWorld)
+        {
+            var ptr = batchLocalToWorldBufferPnt;
+            UnsafeUtility.MemCpy(ptr + index, localToWorld, sizeofFloat4x4);
+            batchLocalToWorldDirtyMaskPnt[index] = true;
             batchLocalToWorldDirty = true;
         }
 
@@ -469,13 +492,13 @@ namespace Com.Rendering
             new SyncBatchLocalToWorldFor
             {
                 length = batchNumber,
-                batchLocalToWorldBuffer = batchLocalToWorldBuffer.AsArray().Reinterpret<float4x4>(),
-                batchLocalToWorldDirtyMask = batchLocalToWorldDirtyMask.AsArray(),
+                batchLocalToWorldBuffer = batchLocalToWorldBuffer.Reinterpret<float4x4>(),
+                batchLocalToWorldDirtyMask = batchLocalToWorldDirtyMask,
                 anyDirty = anyDirty,
             }
             .ScheduleReadOnly(transforms, 64).Complete();
 
-            batchLocalToWorldDirty = *(bool*)anyDirty.GetUnsafePtr();
+            batchLocalToWorldDirty = *(bool*)GetUnsafeBufferPointerWithoutChecks(anyDirty);
             anyDirty.Dispose();
         }
 
@@ -486,8 +509,7 @@ namespace Com.Rendering
         /// <param name="count"></param>
         public unsafe void WriteBatchCountAt(int index, int count)
         {
-            int* ptr = (int*)batchCountBuffer.GetUnsafePtr();
-            ptr[index] = count;
+            batchCountBufferPnt[index] = count;
             batchLocalToWorldDirty = true;
         }
 
@@ -499,7 +521,7 @@ namespace Com.Rendering
         public unsafe void WriteBatchColorAt(int index, in Color color)
         {
             int start = batchSize * index;
-            var ptr = (Color*)instanceColorBuffer.GetUnsafePtr();
+            var ptr = (Color*)instanceColorBufferPnt;
             fixed (Color* pColor = &color)
             {
                 UnsafeUtility.MemCpyReplicate(ptr + start, pColor, sizeofFloat4, batchSize);
@@ -515,7 +537,7 @@ namespace Com.Rendering
         /// <param name="color"></param>
         public unsafe void WriteInstanceColorAt(int batchIndex, int indexOffset, in Color color)
         {
-            var ptr = (Color*)instanceColorBuffer.GetUnsafePtr();
+            var ptr = (Color*)instanceColorBufferPnt;
             ptr[batchSize * batchIndex + indexOffset] = color;
         }
 
@@ -524,12 +546,12 @@ namespace Com.Rendering
             --batchNumber;
             instanceNumber = batchNumber * batchSize;
 
-            Erase(batchLocalToWorldBuffer, batchIndex, batchNumber);
-            Erase(batchLocalToWorldDirtyMask, batchIndex, batchNumber);
-            Erase(batchCountBuffer, batchIndex, batchNumber);
+            Erase(batchLocalToWorldBufferPnt, batchIndex, batchNumber);
+            Erase(batchLocalToWorldDirtyMaskPnt, batchIndex, batchNumber);
+            Erase(batchCountBufferPnt, batchIndex, batchNumber);
             //batchLocalToWorldDirty = true;
 
-            Erase(batchLocalBoundsBuffer, batchIndex, batchNumber);
+            Erase(batchLocalBoundsBufferPnt, batchIndex, batchNumber);
             batchLocalBoundsDirty = true;
 
             int instanceStart = batchIndex * batchSize;
@@ -537,10 +559,10 @@ namespace Com.Rendering
             {
                 int removeIdx = i + instanceStart;
                 int lastIdx = i + instanceNumber;
-                Erase(instanceLocalOffsetBuffer, removeIdx, lastIdx);
-                Erase(instanceColorBuffer, removeIdx, lastIdx);
-                Erase(instanceLocalToWorldBuffer, removeIdx, lastIdx);
-                Erase(instanceWorldToLocalBuffer, removeIdx, lastIdx);
+                Erase(instanceLocalOffsetBufferPnt, removeIdx, lastIdx);
+                Erase(instanceColorBufferPnt, removeIdx, lastIdx);
+                Erase(instanceLocalToWorldBufferPnt, removeIdx, lastIdx);
+                Erase(instanceWorldToLocalBufferPnt, removeIdx, lastIdx);
             }
             // 序列变化了
             instanceVisibleDirty = true;
@@ -611,7 +633,11 @@ namespace Com.Rendering
             shadowCastingMode = shadowCastingMode,
             receiveShadows = recieveShadows,
             rendererPriority = 0,
+#if UNITY_6000_0_OR_NEWER
+            renderingLayerMask = RenderingLayerMask.defaultRenderingLayerMask,
+#else
             renderingLayerMask = GraphicsSettings.defaultRenderingLayerMask,
+#endif
             reflectionProbeUsage = reflectionProbeUsage,
             motionVectorMode = MotionVectorGenerationMode.Camera,
             lightProbeProxyVolume = lightProbeProxyVolume,

@@ -8,6 +8,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Jobs;
+using static Unity.Collections.LowLevel.Unsafe.NativeArrayUnsafeUtility;
 using static Unity.Mathematics.math;
 
 namespace Com.Rendering
@@ -54,16 +55,24 @@ namespace Com.Rendering
         public static unsafe void Erase<T>(NativeArray<T> buffer, int index, int last) where T : unmanaged
         {
             //buffer[index] = buffer[last];
-            var ptr = (T*)buffer.GetUnsafePtr();
+            var ptr = (T*)NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(buffer);
             ptr[index] = ptr[last];
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Erase<T>(NativeList<T> buffer, int index, int last) where T : unmanaged
+        public static unsafe void Erase<T>(T* ptr, int index, int last) where T : unmanaged
         {
             //buffer[index] = buffer[last];
-            var ptr = (T*)buffer.GetUnsafePtr();
             ptr[index] = ptr[last];
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void Erase(float4x4* ptr, int index, int last)
+        {
+            UnsafeUtility.MemCpy(ptr + index, ptr + last, sizeofFloat4x4);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void Erase(float4* ptr, int index, int last)
+        {
+            UnsafeUtility.MemCpy(ptr + index, ptr + last, sizeofFloat4);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -152,33 +161,20 @@ namespace Com.Rendering
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Realloc<T>(ref NativeList<T> nativeList, int capacity) where T : unmanaged
+        public static unsafe void Realloc<T>(ref NativeArray<T> nativeArray, int capacity) where T : unmanaged
         {
-            if (nativeList.IsCreated)
+            if (nativeArray.IsCreated)
             {
-                nativeList.ResizeUninitialized(capacity);
-                nativeList.Length = capacity;
-                if (nativeList.Capacity > capacity)
-                {
-                    nativeList.TrimExcess();
-                }
+                var newArray = new NativeArray<T>(capacity, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+                UnsafeUtility.MemCpy(GetUnsafeBufferPointerWithoutChecks(newArray),
+                    GetUnsafeBufferPointerWithoutChecks(nativeArray),
+                    sizeof(T) * min(capacity, nativeArray.Length));
+                nativeArray.Dispose();
+                nativeArray = newArray;
             }
             else
             {
-                nativeList = new NativeList<T>(capacity, AllocatorManager.Persistent)
-                {
-                    Length = capacity
-                };
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Release<T>(ref NativeList<T> list) where T : unmanaged
-        {
-            if (list.IsCreated)
-            {
-                list.Dispose();
-                list = default;
+                nativeArray = new NativeArray<T>(capacity, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
             }
         }
 
@@ -200,6 +196,12 @@ namespace Com.Rendering
                 array.Dispose();
                 array = default;
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe T* UnsafeGetPoint<T>(this ref NativeList<T> list) where T : unmanaged
+        {
+            return (T*)NativeListUnsafeUtility.GetInternalListDataPtrUnchecked(ref list);
         }
 
         [BurstCompile]
@@ -236,60 +238,15 @@ namespace Com.Rendering
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Min3(float* lhs, float* rhs, float* result)
+        public static int CeilPow2(int x)
         {
-            result[0] = lhs[0] < rhs[0] ? lhs[0] : rhs[0];
-            result[1] = lhs[1] < rhs[1] ? lhs[1] : rhs[1];
-            result[2] = lhs[2] < rhs[2] ? lhs[2] : rhs[2];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Max3(float* lhs, float* rhs, float* result)
-        {
-            result[0] = lhs[0] > rhs[0] ? lhs[0] : rhs[0];
-            result[1] = lhs[1] > rhs[1] ? lhs[1] : rhs[1];
-            result[2] = lhs[2] > rhs[2] ? lhs[2] : rhs[2];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Average3(float* a, float* b, float* o)
-        {
-            o[0] = (a[0] + b[0]) * 0.5f;
-            o[1] = (a[1] + b[1]) * 0.5f;
-            o[2] = (a[2] + b[2]) * 0.5f;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Plus3(float* a, float* b, float* o)
-        {
-            o[0] = a[0] + b[0];
-            o[1] = a[1] + b[1];
-            o[2] = a[2] + b[2];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Minus3(float* a, float* b, float* o)
-        {
-            o[0] = a[0] - b[0];
-            o[1] = a[1] - b[1];
-            o[2] = a[2] - b[2];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Mul3(float* a, float b, float* o)
-        {
-            o[0] = a[0] * b;
-            o[1] = a[1] * b;
-            o[2] = a[2] * b;
-        }
-
-        public static int CeilToPow2(int value)
-        {
-            for (int i = 2; i < int.MaxValue; i <<= 1)
-            {
-                if (i >= value) { return i; }
-            }
-            return 1 << 30;
+            x -= 1;
+            x |= x >> 1;
+            x |= x >> 2;
+            x |= x >> 4;
+            x |= x >> 8;
+            x |= x >> 16;
+            return x + 1;
         }
 
         [BurstCompile(CompileSynchronously = true,
@@ -307,8 +264,8 @@ namespace Com.Rendering
             [NativeDisableParallelForRestriction]
             [ReadOnly] public NativeArray<int>.ReadOnly batchCount;
             [ReadOnly] public NativeArray<float4x4>.ReadOnly instLocalOffset;
-            [WriteOnly] public NativeList<float4x4>.ParallelWriter instLocalToWorld;
-            [WriteOnly] public NativeList<float4x4>.ParallelWriter instWorldToLocal;
+            [WriteOnly] public NativeArray<float4x4> instLocalToWorld;
+            [WriteOnly] public NativeArray<float4x4> instWorldToLocal;
 
             public unsafe void Execute(int index)
             {
@@ -319,14 +276,14 @@ namespace Com.Rendering
                     if (batchLocalToWorldDirty[batchIndex])
                     {
                         var localToWorld = mul(batchLocalToWorld[batchIndex], instLocalOffset[index]);
-                        (*instLocalToWorld.ListData)[index] = localToWorld;
-                        (*instWorldToLocal.ListData)[index] = inverse(localToWorld);
+                        instLocalToWorld[index] = localToWorld;
+                        instWorldToLocal[index] = inverse(localToWorld);
                     }
                 }
                 else
                 {
-                    (*instLocalToWorld.ListData)[index] = 0;
-                    (*instWorldToLocal.ListData)[index] = 0;
+                    instLocalToWorld[index] = 0;
+                    instWorldToLocal[index] = 0;
                 }
             }
         }

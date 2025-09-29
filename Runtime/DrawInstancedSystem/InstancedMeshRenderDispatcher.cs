@@ -69,7 +69,7 @@ namespace Com.Rendering
                 system.BatchNumber = addIndex + 1;
                 savedTokens[count] = token;
                 //transforms[count] = token.transform;
-                tokenTransforms.Add(token.transform);
+                tokenTransforms.Add(token.CachedTransform);
                 //tokenTransforms.SetTransforms(transforms);
                 token.BatchIndex = addIndex;
                 count++;
@@ -184,7 +184,7 @@ namespace Com.Rendering
 
             public TokenInfo(InstancedMeshRenderToken token)
             {
-                savedDispatcher = FindInstanceOrNothing(token.DispatcherName);
+                savedDispatcher = FindInstanceOrNothing(token);
                 systemLevel = BatchSizeToLevel(token);
                 batchIndex = token.BatchIndex;
             }
@@ -194,9 +194,13 @@ namespace Com.Rendering
                 && batchIndex == other.batchIndex;
         }
 
-
-        static readonly Dictionary<string, InstancedMeshRenderDispatcher> sharedInstances =
-            new Dictionary<string, InstancedMeshRenderDispatcher>();
+        static readonly Dictionary<string, int> dispatcherNameHashValues =
+            new Dictionary<string, int>();
+        static readonly HashSet<int> existsIDBucket = new HashSet<int>();
+        static readonly Dictionary<int, InstancedMeshRenderDispatcher> sharedInstances =
+            new Dictionary<int, InstancedMeshRenderDispatcher>();
+        //static readonly Dictionary<string, InstancedMeshRenderDispatcher> sharedInstances =
+        //    new Dictionary<string, InstancedMeshRenderDispatcher>();
         static readonly Dictionary<InstancedMeshRenderToken, TokenInfo> savedTokenInfos =
             new Dictionary<InstancedMeshRenderToken, TokenInfo>();
         readonly SystemWithTokens[] levels = new SystemWithTokens[batchSizeLevels.Length];
@@ -236,6 +240,26 @@ namespace Com.Rendering
             return 10;  // 1024
         }
 
+        static int EnsureDispatcherNameHash(string dispatcherName, ref int? hash)
+        {
+            if (hash.HasValue) { return hash.Value; }
+            if (!dispatcherNameHashValues.TryGetValue(dispatcherName, out var existsHash))
+            {
+                int _thisHash = dispatcherName.GetHashCode();
+                while (!existsIDBucket.Add(_thisHash))
+                {
+                    unchecked
+                    {
+                        _thisHash += 7;
+                    }
+                }
+                dispatcherNameHashValues[dispatcherName] = _thisHash;
+                existsHash = _thisHash;
+            }
+            hash = existsHash;
+            return existsHash;
+        }
+
 
         //[Header("以下字段在预制体中指定，应视为运行期常量。如果修改需要重启场景的组件")]
         [SerializeField] string dispatcherName;
@@ -245,6 +269,8 @@ namespace Com.Rendering
         [SerializeField] int defaultRenderSystemCapacity = 32;
         [SerializeField] int defaultRenderSystemLargeCapacity = 1;
         [SerializeField] int largeCapacityBatchSizeLimit = 2047;
+
+        int? dispatcherNameHash;
 
         //[Header("以下字段可以修改，但需要应用字段")]
         [Header("每个调度器使用固定的阴影和绘制层选项，如果需要变体，实例化额外的预制体")]
@@ -279,7 +305,8 @@ namespace Com.Rendering
             {
                 throw new ArgumentException($"调度器 \"{dispatcherName}\" 名称冲突或者重复注册");
             }
-            sharedInstances.Add(dispatcherName, this);
+            int thisID = EnsureDispatcherNameHash(dispatcherName, ref dispatcherNameHash);
+            sharedInstances.Add(thisID, this);
             //OnDispatcherEnabled?.Invoke(dispatcherName);
             InvokeOnDispatcherEnabled(dispatcherName);
             Active = true;
@@ -293,7 +320,8 @@ namespace Com.Rendering
                 Active = false;
                 //OnBeforeDispatcherDisable?.Invoke(dispatcherName);
                 InvokeOnBeforeDispatcherDisable(dispatcherName);
-                sharedInstances.Remove(dispatcherName);
+                int thisID = EnsureDispatcherNameHash(dispatcherName, ref dispatcherNameHash);
+                sharedInstances.Remove(thisID);
 
                 // 编辑器模式下重载程序域时卸载 levels
                 // https://forum.unity.com/threads/using-jobs-in-the-editor.546706/#post-3608265
@@ -323,7 +351,7 @@ namespace Com.Rendering
             int frameCount = Time.renderedFrameCount;
 
             for (int i = 0; i < sysLen; i++)
-            { 
+            {
                 var item = levels[i];
                 if (item != null)
                 {
@@ -472,8 +500,63 @@ namespace Com.Rendering
         /// <returns></returns>
         public static InstancedMeshRenderDispatcher FindInstanceOrNothing(string name)
         {
-            return !string.IsNullOrEmpty(name) && sharedInstances.TryGetValue(name, out var v)
+            if (string.IsNullOrEmpty(name) || !dispatcherNameHashValues.TryGetValue(name, out var id))
+            {
+                return null;
+            }
+            return sharedInstances.TryGetValue(id, out var v)
                 ? v : null;
+
+            //return !string.IsNullOrEmpty(name) && sharedInstances.TryGetValue(name, out var v)
+            //    ? v : null;
+        }
+
+        /// <summary>
+        /// 在按名称查找之前，需要确保实例已经生成。
+        ///设计预期的做法是将调度器做成预制体，在初始化阶段构造，后续依赖调度器的物件再加载。
+        /// </summary>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        public static InstancedMeshRenderDispatcher FindInstanceOrNothing(InstancedMeshRenderToken token)
+        {
+            return FindInstanceOrNothing(ref token.dispatcherName, ref token.dispatcherID);
+        }
+        public static InstancedMeshRenderDispatcher FindInstanceOrNothing(ref string name, ref int? id)
+        {
+            if (string.IsNullOrEmpty(name)) { return null; }
+            if (id.HasValue && sharedInstances.TryGetValue(id.Value, out var inst))
+            {
+                // HACK: 字符串判等通过后赋值一次，下次判等更容易通过对象地址判等
+                if (ReferenceEquals(inst.dispatcherName, name) || inst.dispatcherName == name)
+                {
+                    name = inst.dispatcherName;
+                    return inst;
+                }
+                else
+                {
+                    Debug.LogWarning($"绘制实例的 id 对应的调度器 {name} 和已保存的 id 不一致，找到了 {inst.dispatcherName}，重新计算 id");
+                    int? newId = null;
+                    EnsureDispatcherNameHash(name, ref newId);
+                    if (sharedInstances.TryGetValue(newId.Value, out inst) && inst.dispatcherName == name)
+                    {
+                        id = newId;
+                        return inst;
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+            }
+            else
+            {
+                EnsureDispatcherNameHash(name, ref id);
+                return sharedInstances.TryGetValue(id.Value, out var v)
+                    ? v : null;
+            }
+
+            //return !string.IsNullOrEmpty(name) && sharedInstances.TryGetValue(name, out var v)
+            //    ? v : null;
         }
 
         public static void TrimExcess()
@@ -521,7 +604,8 @@ namespace Com.Rendering
                 var targetDispatcher = thisTokenInfo.savedDispatcher;
                 if (!targetDispatcher)
                 {
-                    throw new MissingReferenceException($"没有找到调度器 \"{token.DispatcherName}\"");
+                    Debug.LogError($"没有找到调度器 \"{token.DispatcherName}\"，可能未加入场景或者未激活");
+                    return;
                 }
                 if (exist && thisTokenInfo.Equals(savedInfo))
                 {
@@ -570,14 +654,16 @@ namespace Com.Rendering
             }
             token.BatchIndex = -1;
         }
-        static void WriteToRenderSystem(InstancedMeshRenderSystem renderSystem, InstancedMeshRenderToken token, int batchIndex)
+        static unsafe void WriteToRenderSystem(InstancedMeshRenderSystem renderSystem, InstancedMeshRenderToken token, int batchIndex)
         {
+            int tokenCount = token.Count;
             Matrix4x4 tokenLocalToWorld = default;
-            token.ReadLocalToWorld(ref tokenLocalToWorld);
-            renderSystem.WriteBatchLocalToWorldAt(batchIndex, tokenLocalToWorld);
-            renderSystem.WriteBatchCountAt(batchIndex, token.Count);
+            token.UnsafeReadLocalToWorld(&tokenLocalToWorld);
+            //renderSystem.WriteBatchLocalToWorldAt(batchIndex, tokenLocalToWorld);
+            renderSystem.WriteBatchLocalToWorldAtPnt(batchIndex, &tokenLocalToWorld);
+            renderSystem.WriteBatchCountAt(batchIndex, tokenCount);
             renderSystem.WriteLocalBoundsAt(batchIndex, token.ReadLocalBounds);
-            renderSystem.WriteLocalOffsetAt(batchIndex, token.localOffsets, 0, token.Count);
+            renderSystem.WriteLocalOffsetAt(batchIndex, token.localOffsets, 0, tokenCount);
             renderSystem.WriteBatchColorAt(batchIndex, token.InstanceColorGamma);
             // if other material properties...
             //...
@@ -613,13 +699,14 @@ namespace Com.Rendering
                 if (!string.IsNullOrEmpty(currName)
                     && currDispatcher.Active)
                 {
-                    if (sharedInstances.ContainsKey(currName))
+                    int thisID = EnsureDispatcherNameHash(currName, ref currDispatcher.dispatcherNameHash);
+                    if (sharedInstances.ContainsKey(thisID))
                     {
                         Debug.LogWarning($"重复的调度器 {currName}({currDispatcher.name})");
                     }
                     else
                     {
-                        sharedInstances.Add(currName, currDispatcher);
+                        sharedInstances.Add(thisID, currDispatcher);
                     }
                 }
             }
@@ -652,6 +739,8 @@ namespace Com.Rendering
             }
             sharedInstances.Clear();
             savedTokenInfos.Clear();
+            dispatcherNameHashValues.Clear();
+            existsIDBucket.Clear();
         }
 
 #if UNITY_EDITOR

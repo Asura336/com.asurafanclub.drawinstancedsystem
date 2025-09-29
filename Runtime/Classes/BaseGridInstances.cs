@@ -48,7 +48,7 @@ namespace Com.Rendering
 
         protected Mesh GetMesh()
         {
-            var dispatcher = InstancedMeshRenderDispatcher.FindInstanceOrNothing(token.DispatcherName);
+            var dispatcher = InstancedMeshRenderDispatcher.FindInstanceOrNothing(token);
             if (dispatcher != null)
             {
                 return dispatcher.InstancedMesh;

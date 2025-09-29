@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Runtime.CompilerServices;
 using Unity.Burst;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -20,7 +20,8 @@ namespace Com.Rendering
         const int defaultBufferSize = 64;
         const int minBatchSize = 1;
 
-        [SerializeField] string dispatcherName;
+        [SerializeField] internal string dispatcherName;
+        internal int? dispatcherID = null;
         [SerializeField] Bounds localBounds;
         [SerializeField] Color color = Color.white;
         internal Matrix4x4[] localOffsets;
@@ -35,8 +36,10 @@ namespace Com.Rendering
 
         [SerializeField] int virtualBatchIndex;
         Matrix4x4 cachedLocalToWorld = Matrix4x4.identity;
+        int cachedLocalToWorld_frameCount = -1;
 
         Transform cachedTransform;
+
         bool instanceUpdated;
         bool volumeUpdated;
         bool materialPropertyUpdated;
@@ -65,6 +68,12 @@ namespace Com.Rendering
                 Wakeup();
             }
         }
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            dispatcherID = null;
+        }
+#endif
         private void Dispatcher_OnDispatcherEnabled(string dispatcherName)
         {
             //print($"{gameObject.name} listened {dispatcherName} enabled");
@@ -144,7 +153,7 @@ namespace Com.Rendering
         {
             batchSize = batchSize < 2
                 ? minBatchSize
-                : Mathf.Max(minBatchSize, CeilToPow2(count));
+                : Mathf.Max(minBatchSize, CeilPow2(count));
             // set dirty...
             instanceUpdated = true;
             volumeUpdated = true;
@@ -164,14 +173,14 @@ namespace Com.Rendering
         [ContextMenu("check")]
         public void CheckDispatch()
         {
-            if (Application.isEditor)
-            {
-                if (InstancedMeshRenderDispatcher.FindInstanceOrNothing(dispatcherName) == null)
-                {
-                    Debug.LogWarning($"调度器 \"{dispatcherName}\" 没有加入场景或者没有激活");
-                    return;
-                }
-            }
+            //if (Application.isEditor)
+            //{
+            //    if (InstancedMeshRenderDispatcher.FindInstanceOrNothing(dispatcherName, ref dispatcherID) == null)
+            //    {
+            //        Debug.LogWarning($"调度器 \"{dispatcherName}\" 没有加入场景或者没有激活");
+            //        return;
+            //    }
+            //}
             InstancedMeshRenderDispatcher.Evaluate(this);
         }
 
@@ -236,7 +245,7 @@ namespace Com.Rendering
         /// </summary>
         public void TrimExcess()
         {
-            int batchNums = Mathf.Max(minBatchSize, CeilToPow2(count));
+            int batchNums = Mathf.Max(minBatchSize, CeilPow2(count));
             if (batchNums < localOffsets.Length * 0.9f)
             {
                 Realloc(ref localOffsets, batchNums);
@@ -252,13 +261,7 @@ namespace Com.Rendering
         public string DispatcherName
         {
             get => dispatcherName ?? string.Empty;
-            set
-            {
-                if (!(dispatcherName ?? string.Empty).Equals(value, StringComparison.Ordinal))
-                {
-                    dispatcherName = value;
-                }
-            }
+            set => dispatcherName = value;
         }
 
         /// <summary>
@@ -272,7 +275,7 @@ namespace Com.Rendering
             {
                 if (count != value)
                 {
-                    batchSize = Mathf.Max(minBatchSize, CeilToPow2(value));
+                    batchSize = Mathf.Max(minBatchSize, CeilPow2(value));
                     // realloc?
                     if (batchSize > Capacity)
                     {
@@ -298,8 +301,30 @@ namespace Com.Rendering
         public Matrix4x4 LocalToWorld => cachedTransform.localToWorldMatrix;
         public void ReadLocalToWorld(ref Matrix4x4 localToWorld)
         {
-            localToWorld = cachedTransform.localToWorldMatrix;
+            EnsureCachedLocalToWorldCore();
+            localToWorld = cachedLocalToWorld;
         }
+        internal unsafe void UnsafeReadLocalToWorld(Matrix4x4* dstLocalToWorld)
+        {
+            EnsureCachedLocalToWorldCore();
+            fixed (Matrix4x4* cachedLocalToWorldPnt = &cachedLocalToWorld)
+            {
+                UnsafeUtility.MemCpy(dstLocalToWorld, cachedLocalToWorldPnt, sizeofFloat4x4);
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void EnsureCachedLocalToWorldCore()
+        {
+            int fc = Time.frameCount;
+            if (fc != cachedLocalToWorld_frameCount)
+            {
+                cachedLocalToWorld_frameCount = fc;
+                cachedLocalToWorld = cachedTransform.localToWorldMatrix;
+            }
+        }
+
+
+        internal Transform CachedTransform => cachedTransform;
 
         public bool Active { get; private set; }
 
