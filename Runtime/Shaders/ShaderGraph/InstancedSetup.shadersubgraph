@@ -112,10 +112,10 @@
         "m_Expanded": true,
         "m_Position": {
             "serializedVersion": "2",
-            "x": -103.50006103515625,
-            "y": -129.75001525878907,
-            "width": 207.99996948242188,
-            "height": 278.0000305175781
+            "x": -103.0,
+            "y": -130.0,
+            "width": 208.0,
+            "height": 278.0
         }
     },
     "m_Slots": [
@@ -140,7 +140,7 @@
     "m_SourceType": 1,
     "m_FunctionName": "dummy",
     "m_FunctionSource": "",
-    "m_FunctionBody": "OUT = IN;\n\n#pragma editor_sync_compilation\r\n#pragma multi_compile_instancing\r\n#pragma multi_compile _ LOD_FADE_CROSSFADE\r\n#pragma shader_feature_local INSTANCED_COLOR\r\n#pragma instancing_options renderinglayer procedural:ConfigureProcedural\r\n#define UNITY_INSTANCING_PROCEDURAL_FUNC ConfigureProcedural"
+    "m_FunctionBody": "OUT = IN;\n}\n\n\n#pragma target 4.5\n#pragma editor_sync_compilation\r\n#pragma multi_compile_instancing\r\n#pragma multi_compile _ LOD_FADE_CROSSFADE\r\n#pragma shader_feature_local INSTANCED_COLOR\r\n#pragma instancing_options renderinglayer procedural:ConfigureProcedural\r\n#define UNITY_INSTANCING_PROCEDURAL_FUNC ConfigureProcedural\n\n\nvoid make_me_empty()\n{\n"
 }
 
 {

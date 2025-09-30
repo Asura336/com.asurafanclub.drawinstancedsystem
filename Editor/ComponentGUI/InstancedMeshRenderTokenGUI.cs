@@ -62,9 +62,11 @@ namespace Com.Rendering.Editor
         {
             serializedObject.Update();
 
+            var targetT = (InstancedMeshRenderToken)target;
+
             // 字段...
             EditorGUILayout.PropertyField(dispatcherName, LocalStyle.dispatcherName);
-            var dispatcher = InstancedMeshRenderDispatcher.FindInstanceOrNothing(dispatcherName.stringValue);
+            var dispatcher = InstancedMeshRenderDispatcher.FindInstanceOrNothing(targetT);
             if (dispatcher != null)
             {
                 GUI.enabled = false;
