@@ -55,7 +55,7 @@ namespace Com.Rendering
         public static unsafe void Erase<T>(NativeArray<T> buffer, int index, int last) where T : unmanaged
         {
             //buffer[index] = buffer[last];
-            var ptr = (T*)NativeArrayUnsafeUtility.GetUnsafeBufferPointerWithoutChecks(buffer);
+            var ptr = (T*)GetUnsafeBufferPointerWithoutChecks(buffer);
             ptr[index] = ptr[last];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

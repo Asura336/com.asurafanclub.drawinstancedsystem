@@ -555,15 +555,29 @@ namespace Com.Rendering
             batchLocalBoundsDirty = true;
 
             int instanceStart = batchIndex * batchSize;
-            for (int i = 0; i < batchSize; i++)
-            {
-                int removeIdx = i + instanceStart;
-                int lastIdx = i + instanceNumber;
-                Erase(instanceLocalOffsetBufferPnt, removeIdx, lastIdx);
-                Erase(instanceColorBufferPnt, removeIdx, lastIdx);
-                Erase(instanceLocalToWorldBufferPnt, removeIdx, lastIdx);
-                Erase(instanceWorldToLocalBufferPnt, removeIdx, lastIdx);
-            }
+            int lastStart = instanceNumber;
+            long batchSize_4x4 = sizeofFloat4x4 * batchSize,
+                batchSize_4 = sizeofFloat4 * batchSize;
+            UnsafeUtility.MemCpy(instanceLocalOffsetBufferPnt + instanceStart,
+                instanceLocalOffsetBufferPnt + lastStart, batchSize_4x4);
+            UnsafeUtility.MemCpy(instanceLocalToWorldBufferPnt + instanceStart,
+              instanceLocalToWorldBufferPnt + lastStart, batchSize_4x4);
+            UnsafeUtility.MemCpy(instanceWorldToLocalBufferPnt + instanceStart,
+                instanceWorldToLocalBufferPnt + lastStart, batchSize_4x4);
+            UnsafeUtility.MemCpy(instanceColorBufferPnt + instanceStart,
+                instanceColorBufferPnt + lastStart, batchSize_4);
+
+            //int instanceStart = batchIndex * batchSize;
+            //for (int i = 0; i < batchSize; i++)
+            //{
+            //    int removeIdx = i + instanceStart;
+            //    int lastIdx = i + instanceNumber;
+            //    Erase(instanceLocalOffsetBufferPnt, removeIdx, lastIdx);
+            //    Erase(instanceColorBufferPnt, removeIdx, lastIdx);
+            //    Erase(instanceLocalToWorldBufferPnt, removeIdx, lastIdx);
+            //    Erase(instanceWorldToLocalBufferPnt, removeIdx, lastIdx);
+            //}
+
             // 序列变化了
             instanceVisibleDirty = true;
         }
